@@ -13,10 +13,15 @@ OPT_LENGTH = 12
 DEFAULTS = [
     ["MEDIUM", "ON", "SHIFT", "MONO", "OFF", None],  # GAME
     ["30", "GEN 1", "OFF", "OFF", "OFF", "OFF", "OFF"],  # DISPLAY
-    ["OFF"] * 6,  # CHALLENGE
+    ["OFF"] * 6 + ["ON"],  # CHALLENGE (BADGE BOOST, Gen 1's, is on)
     ["OFF"] * 4,  # CLAUSES
-    ["OFF"] * 7,  # EXTRAS
+    ["OFF"] * 5,  # EXTRAS
+    ["OFF"] * 5,  # RANDOMIZER
+    ["OFF"] * 7,  # RANDOM #MON
 ]
+RANDOMIZER = 5
+RANDOM_MONS = 6
+DOORS, KEYS, ITEMS, MARTS = 1, 2, 4, 8  # wRandoFlags
 
 
 def decode(data):
@@ -44,6 +49,8 @@ class OptionsTest(unittest.TestCase):
         for i in range(0x100 // 8, 0xA00 // 8):  # every event flag but the story's first
             g.poke(f"wEventFlags+{i}", 0)
         g.poke("wDisplayOptions", 0)
+        g.poke("wRandoFlags", 0)
+        g.poke("wOptionsInGame", 0)
         g.call("InitOptions")
 
     def string(self, address, limit=40):
@@ -106,9 +113,9 @@ class OptionsTest(unittest.TestCase):
 
     def test_random_wild(self):
         g = self.game
-        wild = self.options(4)[3]
+        wild = self.options(RANDOM_MONS)[1]
         events = g.addr("wEventFlags")
-        for value, name, flags in [(1, "TIER", (0, 1)), (2, "FULL", (1, 1)), (0, "OFF", (0, 0))]:
+        for value, name, flags in [(1, "TIER", (0, 1)), (2, "FULL", (1, 1)), (3, "AREA", (0, 0)), (0, "OFF", (0, 0))]:
             self.change(wild, value)
             full = g.peek(events + 0x8D7 // 8) >> (0x8D7 % 8) & 1  # EVENT_8D7
             randomized = g.peek(events + 0x8DE // 8) >> (0x8DE % 8) & 1  # EVENT_8DE
@@ -126,11 +133,60 @@ class OptionsTest(unittest.TestCase):
         self.assertEqual(g.peek("wUnusedD721"), 0)
         self.assertEqual(self.value(switching), "ON")
 
+    def test_badge_boost_off(self):
+        g = self.game
+        boost = self.options(2)[6]
+        events = g.addr("wEventFlags")
+        self.change(boost, 1)
+        self.assertEqual(self.value(boost), "OFF")
+        self.assertEqual(g.peek(events + 0x8D2 // 8) >> (0x8D2 % 8) & 1, 1)  # EVENT_NO_BADGE_BOOSTS
+        self.change(boost, 0)
+        self.assertEqual(self.value(boost), "ON")
+
     def test_level_cap_shows_the_cap(self):
         g = self.game
         cap = self.options(2)[2]
         self.change(cap, 1)
         self.assertRegex(self.value(cap), r"^:L\d+$")
+
+    def test_randomizer_choices(self):
+        g = self.game
+        doors, keys, items, marts = self.options(RANDOMIZER)[:4]
+        self.change(items, 1)
+        self.change(marts, 1)
+        self.assertEqual(g.peek("wRandoFlags"), ITEMS | MARTS)
+        # shuffled doors need shuffled key items, both ways
+        self.change(doors, 1)
+        self.assertEqual(g.peek("wRandoFlags"), DOORS | KEYS | ITEMS | MARTS)
+        self.change(keys, 0)
+        self.assertEqual(g.peek("wRandoFlags"), ITEMS | MARTS)
+        self.change(keys, 1)
+        self.assertEqual(g.peek("wRandoFlags"), KEYS | ITEMS | MARTS)
+        self.assertEqual([self.value(e) for e in (doors, keys, items, marts)], ["OFF", "ON", "ON", "ON"])
+
+    def test_randomizer_locked_in_game(self):
+        g = self.game
+        g.skip_sound_waits()
+        g.poke("wOptionsInGame", 1)
+        for entry in self.options(RANDOMIZER) + self.options(RANDOM_MONS):
+            self.change(entry, 1)
+        self.assertEqual([g.peek(f) for f in ("wRandoFlags", "wRandoFlags2", "wRandoFlags3")], [0, 0, 0])
+
+    def test_random_mon_fields(self):
+        g = self.game
+        starters, wild, trainers, special, tm_moves, compat, learn = self.options(RANDOM_MONS)
+        for entry, value, name in [(starters, 2, "TYPES"), (trainers, 2, "ALL"), (special, 1, "ON"),
+                                   (tm_moves, 1, "ON"), (compat, 3, "FULL"), (learn, 3, "METRONOME"),
+                                   (wild, 3, "AREA")]:
+            self.change(entry, value)
+            self.assertEqual(self.value(entry), name)
+        self.assertEqual(g.peek("wRandoFlags2"), 2 | 1 << 2 | 1 << 4 | 1 << 5)
+        self.assertEqual(g.peek("wRandoFlags3"), 1 | 3 << 1 | 3 << 3)
+        self.change(trainers, 1)
+        self.assertEqual(self.value(trainers), "ON")
+        self.assertEqual(g.peek("wRandoFlags2") & 1 << 4, 0)
+        events = g.addr("wEventFlags")
+        self.assertTrue(g.peek(events + 0x8D8 // 8) & 1 << (0x8D8 % 8))
 
     def test_rules_survive_new_game(self):
         g = self.game

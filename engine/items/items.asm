@@ -731,6 +731,10 @@ CaughtMonExperience:
 	cp BATTLE_TYPE_SAFARI
 	ret z
 	call ClearSprites ; the thrown ball, which would sit over the stat boxes
+	coord hl, 12, 0 ; and the caught mon's pic, which the stat boxes would
+	lb bc, 7, 7     ; put back when they close
+	call ClearScreenArea
+	call SaveScreenTilesToBuffer1
 	ld a, [wcf91]
 	push af
 	ld a, [wd11e]
@@ -2250,6 +2254,7 @@ RodResponse:
 ;joenote - generate a random wild pokemon based on a seed value
 	ld [wcf91], a
 	predef ReplaceWildMon
+	callba RandoFishArea ; WILD AREA: from the water deck
 	ld a, [wcf91]
 	ld [wCurOpponent], a
 
@@ -3201,6 +3206,10 @@ ItemUseReloadOverworldData:
 FindWildLocationsOfMon:
 	ld a, 0
 	ld [wActionResultOrTookBattleTurn], a	;joenote - used to differentiate between land, water, and super rod finding
+	callba RandoAreaLocations ; WILD AREA: its own list
+	ld a, e
+	and a
+	ret nz
 
 	ld a, [wd11e]
 	push af

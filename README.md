@@ -37,7 +37,7 @@ Every option starts as the original game played; everything extra is off by defa
 - Gen 5+ damage formula with 16-bit stats; modifiers applied in Gen 9 order; 999 cap kept.
 - Critical hits: Gen 9 stages (1/24, 1/8, 1/2, always), x1.5, ignore bad stages and screens.
 - Stat stages use Gen 9 ratios; accuracy is one net stage (accuracy minus evasion).
-- Badge stat boosts removed; Stadium-style and speed-based crit rates removed.
+- Stadium-style and speed-based crit rates removed.
 - Burn halves physical damage instead of Attack; Explosion no longer halves Defense.
 - Confused self-hit: 40 power, own Attack vs own Defense, never critical, ignores Reflect.
 - Sleep 1-3 turns; freeze 20% thaw per turn; paralysis halves Speed, 25% full para.
@@ -97,7 +97,7 @@ Every option starts as the original game played; everything extra is off by defa
 - 49 new moves: Aerial Ace, Air Slash, AncientPower, Aqua Jet, Brine, Bug Bite, Bug Buzz, Bulldoze, Close Combat, Cross Chop, Crunch, Disarming Voice, DragonBreath, Dragon Rush, Drill Run, DynamicPunch, Earth Power, ExtremeSpeed, Fire Fang, Flame Wheel, Flare Blitz, Flash Cannon, Giga Drain, Gunk Shot, Heat Wave, Hyper Voice, Icicle Crash, Incinerate, Leaf Blade, Liquidation, Low Sweep, Mach Punch, Moonblast, Pluck, Poison Fang, Poison Jab, Powder Snow, Psyshock, Razor Shell, Round, Seed Bomb, Shadow Ball, Sludge Bomb, Stomping Tantrum, Stone Edge, Twister, Water Pulse, X-Scissor.
 - New moves reuse existing animations and sounds.
 - Not implemented: Bug Bite/Pluck/Incinerate berry effects, Stomping Tantrum doubling, Twister vs flying mons.
-- Learnset audit: all 249 recommendations applied (level-up learnsets and starting moves).
+- Learnset audit: all 249 recommendations applied (level-up learnsets and starting moves). Every Pokémon's changes from Red and Blue (Shin's and this fork's), the new moves and changed move data are listed in [docs/moveset_changes.md](docs/moveset_changes.md).
 - Horn Drill and Guillotine removed from level-up learnsets.
 - Evolving teaches the new form's level 1 moves (Gen 7+).
 
@@ -110,18 +110,41 @@ Every option starts as the original game played; everything extra is off by defa
 - Party submenu is STATS, MOVES, SWITCH, CANCEL plus up to four field moves.
 - Bag opens full screen with auto-sorted pockets: ITEMS, MEDICINE, BALLS, BATTLE ITEMS, BERRIES, KEY ITEMS.
 - Bag holds 36 kinds; LEFT/RIGHT change pocket.
-- OPTION screen: five pages (GAME, DISPLAY, CHALLENGE, CLAUSES, EXTRAS) with two-line explanations.
+- Bag shows two lines on the item under the cursor (Gold/Silver-style), with four entries on the screen.
+- Shops' buy lists show the same two lines on the item under the cursor (a TM names its move).
+- OPTION screen: seven pages (GAME, DISPLAY, CHALLENGE, CLAUSES, EXTRAS, RANDOMIZER, RANDOM POKéMON) with two-line explanations.
 - GAME: TEXT SPEED, BATTLE ANIM, BTL. STYLE, AUDIO, EXP. SHARE, SOUND TEST.
 - DISPLAY: FRAME RATE, SPRITES, MORE COLOR, COLOR FIX, SYMBOLS, TYPE HINT, HP PERCENT.
 - HP PERCENT: the enemy HUD shows its HP as a percentage number (Showdown-style, no % sign) in place of "HP:"; it counts up or down with the bar.
-- CHALLENGE: HARD MODE, AI SWITCHING, LEVEL CAP, SCALING, ALT. MOVES, NUZLOCKE.
+- CHALLENGE: HARD MODE, AI SWITCHING, LEVEL CAP, SCALING, ALT. MOVES, NUZLOCKE, BADGE BOOST.
+- BADGE BOOST: Gen 1's badge boosts (each badge raises its stat of your Pokémon by 1/8; the Volcano Badge raises both specials), on by default. They never stack: a stat gets its boost only when it is worked out again. Turn them off here; link battles never have them.
 - CLAUSES: ITEM, SLEEP, FREEZE, HYPER BEAM.
-- EXTRAS: HEAL ON WIN, WARP BACK, CATCH-UP EXP, RANDOM WILD (OFF/TIER/FULL), RANDOM TRNR, SAFARI EVENT, PC IN MENU.
+- EXTRAS: HEAL ON WIN, WARP BACK, CATCH-UP EXP, SAFARI EVENT, PC IN MENU.
+- RANDOMIZER: DOORS, KEY ITEMS, ITEMS, MARTS, TRADES; RANDOM POKéMON: STARTERS, WILD, TRAINERS, SPECIAL MON, TM MOVES, TM COMPAT., LEARNSETS (see Randomizer).
 - Defaults match the original game: MEDIUM text, SHIFT, 30 fps, no smart AI switching, COLOR FIX off, all extras off.
 - Rule options can be set from the title screen before NEW GAME.
 - TYPE HINT: OFF (default), ON, or LEARNED (only matchups seen in battle; "?" otherwise).
 - PC IN MENU: start menu PC item opens the full PC (hidden in link rooms).
 - Title screen: "Red 30th Anniversary" (Blue and Green in those builds) under the logo, in the original "Red Version" lettering; main menu shows version 0.9.0.
+
+#### Randomizer
+- Options on the RANDOMIZER and RANDOM POKéMON pages, all off by default, set from the title screen before NEW GAME (from the start menu they only show).
+- DOORS: every door and staircase is shuffled, two-way (outside doors with insides, stairs with stairs). Red's house, Oak's lab, the Viridian mart (Oak's Parcel), the elevators and the Elite Four to Hall of Fame chain stay put; the S.S. Anne, Safari Zone, Silph Co., Rocket Hideout, Victory Road, Seafoam Islands and Pokémon Mansion keep their insides, with only their ways out shuffled.
+- KEY ITEMS: key items and HMs are shuffled among item balls and gifts (DOORS turns it on). Badges are not shuffled. Hidden items and the Pokédex-count aides never hold key items.
+- ITEMS: the other items in balls, hidden spots and gifts are shuffled, and each species' wild held items are another species'.
+- MARTS: each mart (but Viridian's, the bike shop, Shin's special mart and the drink machines) sells Poké Balls, Potions and Escape Ropes plus a random pick from the other marts' items.
+- TRADES: the in-game trades ask for and give other Pokémon of similar strength.
+- STARTERS: RANDOM gives three different three-stage lines; TYPES three whose types beat each other in turn, like Grass, Fire and Water. The rival takes the one that beats yours, and keeps its line all game.
+- WILD: OFF, TIER, FULL (Shin's swaps, now from the whole seed) or AREA: each encounter slot has its own basic Pokémon, evolved as far as its level allows; the land slots run through every basic Pokémon but the legendaries, so each can be caught somewhere; surfing and fishing give Water types. The Pokédex's AREA follows it.
+- TRAINERS: OFF, ON (Shin's: regular trainers) or ALL: every trainer, gym leaders and Elite Four included, gets Pokémon of similar strength (base stat total), of their type theme if they had one (gym leaders and the Elite Four always), evolved as far as their level allows; no legendaries; the rival keeps the starter line; the bosses' Pokémon that held nothing hold a random battle item.
+- SPECIAL MON: the legendaries, the Power Plant's, both Snorlax, Eevee, Lapras, the dojo's, the fossils, the Magikarp salesman's, the Game Corner prizes and the old man's Weedle become others of similar strength (legendaries stay legendaries).
+- TM MOVES: each TM teaches a random move, no two the same; HMs stay.
+- TM COMPAT.: who can learn the TMs: TYPE (always their own types, Normal half the time, others a fifth), RANDOM (half), FULL (everyone everything). HMs keep their own compatibility but with FULL.
+- LEARNSETS: level-up and starting moves: TYPE (their own types half the time), RANDOM, or METRONOME only. A damaging move stays a damaging move, a status move a status move.
+- NEW GAME asks for a SEED (up to 10 letters; none gives a random one). The same seed with the same randomizer options gives the same game, including RANDOM WILD and RANDOM TRNR.
+- The world is checked to be finishable, with no place you can walk into and get stuck. Building it takes about 20 seconds on a Game Boy, 10 on a Game Boy Color, once per game.
+- In a shuffled world (DOORS or KEY ITEMS), trainers' Pokémon more than 2 levels (bosses 3) above your highest, and wild ones above it, come down to it, as their pre-evolution if needed. Only down; SCALING still raises them.
+- With DOORS: the S.S. Anne's sailor always takes the ticket, the Elite Four's door needs all 8 badges, and a Pokémon Center sets its own town for blackouts.
 
 #### Breeding and day care
 - Day care holds two Pokémon; both gain experience.
@@ -161,6 +184,8 @@ Every option starts as the original game played; everything extra is off by defa
 - Enemy fully paralyzed or self-hit mid-Fly/Dig stayed invulnerable.
 - Accuracy/evasion stage changes re-applied every badge boost to the player's stats.
 - Transform desynced link battles (only the player's move index was reset).
+- Gym leaders' and the Elite Four's special moves could give a mon the same move twice with trainer level scaling on.
+- X Accuracy let a slower enemy land a one-hit KO move but not the player; in link battles this put the two games out of step.
 
 #### Removed from Shin
 - NPC and object rule toggles (rules are now options); Oak's Lab NPCs and Viridian house restored.
@@ -169,7 +194,7 @@ Every option starts as the original game played; everything extra is off by defa
 - Saffron move deleter and relearner NPCs; teaching TMs from the bag (replaced by MOVES screen).
 - SELECT-swapped second bag.
 - Mid-game wild randomizer reseed; Safari event no longer locked until after the Elite Four.
-- Trapping clause, enhanced Psywave, badge boosts, Gen 1 crit modes.
+- Trapping clause, enhanced Psywave, Gen 1 crit modes.
 
 #### Internal
 - Player/enemy battle routine pairs merged; PC box and day care moved to save RAM.
@@ -402,7 +427,7 @@ Every option starts as the original game played; everything extra is off by defa
 - Physical/special by type → split by move.
 - Gen 1 type chart → Gen 6+ chart with Steel, Dark and Fairy; Gen 9 base stats, catch rates and move data.
 - Gen 1 damage, crits, stat stages and burn/paralysis penalties → Gen 9's.
-- Shin's crit tweaks, Stadium crits in hard mode and badge boosts (incl. hard-mode trainer-battle rule) → removed.
+- Shin's crit tweaks and Stadium crits in hard mode → removed; badge boosts kept, with a CHALLENGE option to turn them off in place of the hard-mode trainer-battle rule.
 - Shin's sleep counter, Rest and Haze → Gen 9 status rules and Haze.
 - Shin's Rage (2-3 turns), Psywave re-rolls, Bide, Disable, Mimic, Mirror Move, Counter, Substitute and crash-damage rules → Gen 9/Gen 7 behaviour.
 - Shin's Reflect/Light Screen cap → 5-turn side conditions.

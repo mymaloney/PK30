@@ -94,7 +94,7 @@ _OaksAideHiText::
 	text ""
 	line "kinds of #MON,"
 	cont "I'm supposed to"
-	cont "give you an"
+	cont "give you the"
 	cont "@"
 	TX_RAM wOaksAideRewardItemName
 	text "!"
@@ -1100,10 +1100,11 @@ _EnemyMonFaintedText::
 	prompt
 
 _MoneyForWinningText::
-	text "<PLAYER> got ¥@"
+	text "<PLAYER> got"
+	line "¥@"
 	TX_BCD wAmountMoneyWon, 3 | LEADING_ZEROES | LEFT_ALIGN
 	text ""
-	line "for winning!"
+	cont "for winning!"
 	prompt
 
 _TrainerDefeatedText::
@@ -1298,8 +1299,9 @@ _ThrashingAboutText::
 	done
 
 _HurtByBindingText::
-	text "<USER>'s hurt"
-	line "by @"
+	text "<USER>'s"
+	line "hurt by"
+	cont "@"
 	TX_RAM wcd6d
 	text "!"
 	prompt
@@ -2294,8 +2296,9 @@ _HitWithRecoilText::
 	prompt
 
 _ConvertedTypeText::
-	text "<USER>'s type"
-	line "became @"
+	text "<USER>'s"
+	line "type became"
+	cont "@"
 	TX_RAM wcd6d
 	text "!"
 	prompt

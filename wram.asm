@@ -3128,8 +3128,12 @@ wSeafoamIslands5CurScript:: ; d668
 	ds 1
 wRoute18GateCurScript:: ; d669
 	ds 1
+wRandoFlags2:: ; the randomizer's #MON choices (RANDO2_*): saved
+	ds 1
+wRandoFlags3:: ; and its moves' (RANDO3_*)
+	ds 1
 ;usused space
-	ds 30
+	ds 28
 wTempFieldMoveSlots::	;joenote - for field move slot
 	ds 6
 wGameProgressFlagsEnd::
@@ -3255,8 +3259,11 @@ wUnusedD721:: ; d721	;joenote - use to set various wram flags
 ;;;;;;;;;;;;;;joenote - use these unused locations for debugging and parsing DV scores or holding temp values
 wUnusedD722:: 
 	ds 4
-wUnusedD726::
-	ds 2
+wLastRepelUsed:: ; the kind of repel last used, offered again when it wears off (0: none);
+	; saved, so a repel still running in a loaded game is offered again too
+	ds 1
+wUnusedD727::
+	ds 1
 ;;;;;;;;;;;;;;
 wd728:: ; d728
 ; bit 0: using Strength outside of battle
@@ -3312,6 +3319,7 @@ wd72e:: ; d72e
 ; bit 7: set if scripted NPC movement has been initialised
 	ds 1
 
+wOptionsInGame:: ; the OPTION screen was opened from the start menu
 	ds 1
 
 wd730:: ; d730
@@ -3459,7 +3467,10 @@ wRandomizerSeed:: 	;da3B
 ;joenote - generate a random seed for fisher-yates randomizer functions
 	ds 1
 
-	ds 5
+wRandoSeed:: ; the randomizer's seed: a hash of what the player typed and wRandoFlags
+	ds 4
+wRandoFlags:: ; what the randomizer shuffles (RANDO_*_F)
+	ds 1
 
 wPlayTimeHours:: ; da41
 	ds 1
@@ -3677,14 +3688,19 @@ wHoFSlot:: ; the Hall of Fame slot being recorded (eggs are skipped)
 	ds 1
 wPartyIconSpecies:: ; the species whose icon each party slot's sprite tiles hold
 	ds PARTY_LENGTH
-wLastRepelUsed:: ; the kind of repel last used, offered again when it wears off (0: none)
-	ds 1
 wHPPercentTiles:: ; the HP PERCENT option's two tiles (engine/battle/hp_percent.asm)
 	ds 2 * 16
 wHPPercentDigits:: ; its hundreds, tens and ones (10: blank)
 	ds 3
 wHPPercentShown:: ; the percentage its tiles show now
 	ds 1
+wMartDescriptions:: ; nonzero while the shop's buy list is up: the item under
+	ds 1                ; the cursor is described (MenuItemDescription)
+
+wRandoLearnsetSpecies:: ; LEARNSETS: the #MON whose learnset is in wRandoLearnset
+	ds 1
+wRandoLearnset:: ; its evolutions and learnset, with LEARNSETS' moves (RandoLearnset)
+	ds RANDO_LEARNSET_SIZE
 
 ; free up to the stack at $df00
 

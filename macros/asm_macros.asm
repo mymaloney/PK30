@@ -202,3 +202,36 @@ ENDM
 MACRO ldPal
 	ld \1, \2 << 6 | \3 << 4 | \4 << 2 | \5
 ENDM
+
+; a gift's item: the vanilla one, or the randomizer's for that location
+MACRO rando_gift ; location (RANDO_LOC_*), vanilla item -> a
+	ld de, (\2) << 8 | RANDO_LOC_\1
+	callba RandoGiftItem
+	ld a, e
+ENDM
+
+; a one-off #MON: the vanilla one, or SPECIAL MON's for this map
+MACRO rando_special ; vanilla species -> a
+	ld e, \1
+	callba RandoSpecialMon
+	ld a, e
+ENDM
+
+; hl = a #MON's evolutions and learnset (EvosMovesPointerTable's bank), a =
+; the #MON -> hl = them with LEARNSETS' moves (a copy in wRandoLearnset), or
+; as they were. bc lost.
+MACRO rando_learnset
+	ld [wRandoLearnsetSpecies], a
+	ld a, [wRandoFlags3]
+	and RANDO3_LEARN
+	jr z, .asTheyWere\@
+	ld a, l
+	ld [wRandoLearnset], a
+	ld a, h
+	ld [wRandoLearnset + 1], a
+	push de
+	callba RandoBuildLearnset
+	pop de
+	ld hl, wRandoLearnset
+.asTheyWere\@
+ENDM

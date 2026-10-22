@@ -1068,7 +1068,8 @@ types and stats, moves), through generator scripts in `tools/`.
    replace the three DV bytes and ten stat-experience bytes, so each mon's
    data gets 3 bytes smaller.
 4. The damage formula, critical hits (stages, x1.5, which stages and
-   screens they ignore), stat and accuracy stages; badge boosts go.
+   screens they ignore), stat and accuracy stages; badge boosts went here
+   and came back later as an option (see below).
 5. Status conditions.
 6. Move behaviours (priority, secondary-effect chances, trapping, screens,
    Haze, Substitute, Counter, recoil and crash, switching moves...).
@@ -1207,8 +1208,18 @@ a new bank, `$35` ("Battle 2"), replacing the old code as it goes.
   are gone, in every mode.
 - **Stages** are Gen 9's ratios for the stored stats too, and accuracy is one
   net stage, accuracy minus evasion, from 3/9 to 9/3.
-- **Burn** halves damage, not the Attack stat, so curing it changes no stat;
-  **badge boosts** are gone (Gen 9 has none).
+- **Burn** halves damage, not the Attack stat, so curing it changes no stat.
+  **Badge boosts** went with this part (Gen 9 has none) and were later
+  brought back, on by default, with the CHALLENGE option BADGE BOOST to turn
+  them off: `ApplyBadgeStatBoosts` multiplies a stat by 1.125 only right
+  after it is worked out again from its stage, so boosts never stack. Every
+  stat gets it after a switch-in, a level-up in battle, Haze or a move that
+  changes several of the user's stats (`ApplyAllBadgeStatBoosts`, which
+  also ignores a stale `wUnusedD71B` left by the enemy's own stat change);
+  after one stat's change, only that one. Not in link battles, and Shin's
+  hard-mode rule (none in trainer battles) stays gone: the option replaces
+  it. Critical hits use the unmodified stats, so they ignore the boosts, as
+  in Gen 1. Tests: `tests/test_badge_boosts.py`.
 - **The confused self-hit** is Gen 9's: 40 power, the mon's own Attack
   against its own Defense with their stages, x85-100%, never critical, and
   no longer touched by the foe's Reflect.
@@ -1473,6 +1484,11 @@ One commit per group:
   when the spreadsheet is present). A move goes to the proposed level and
   out of wherever the species had it; "Remove" takes Horn Drill and
   Guillotine away. `docs/learnset_changes.md` lists every change.
+  `docs/moveset_changes.md` (from `tools/moveset_changes.py`) lists every
+  moveset change against Red and Blue (pret/pokered), each marked as Shin's
+  or this fork's: level-up and starting moves, TM/HM compatibility, the TM
+  list, the new moves and the old moves' changed data. Re-run it after any
+  learnset or move data change.
 - **Starting moves**: a starting move the sheet moves later comes out of the
   base stats' four; Zubat's only one (Leech Life, now at 12) gives way to
   Absorb, its first damaging Gen 9 level 1 move.
@@ -1996,3 +2012,290 @@ The hack is named **Pokémon Red 30th Anniversary**, PK30 for short.
   also loses Shin's "SHIN" and 真. Checked in the emulator in the Red, Blue,
   Green and Red-JP builds.
 - The ROM header title is still "POKEMON RED" etc.
+
+## Verification for 1.0
+
+Merged to `master` as v0.9.0. The plan for checking the whole game before
+1.0 (static checks, sweeps, soak tests, story checkpoints, builds and saves,
+and the playtest) is in `docs/verification_plan.md`, with its status table.
+
+- **Phase 1 fixes** (details in `docs/verification_plan.md`): special
+  trainer moves no longer duplicate a known move (`ReadTrainer` swaps the
+  two slots; Bruno's first Onix gets SLAM back in slot 3, as Shin's comment
+  intended); 16 battle messages rewritten to fit the box after an enemy's
+  name; `wLastRepelUsed` moved into the saved block (the unused
+  `wUnusedD726`).
+- **Fixed: giving a held item locked the field** (reported in the playtest).
+  `ItemUseHeldItem_` showed the party menu with sprite updates off and
+  returned to the bag without turning them back on or reloading the map's
+  sprite tiles (the party menu's icons overwrite them), because the bag only
+  does that for the items in `UsableItems_PartyMenu`. After leaving the menu
+  the player had vanished and couldn't move, or the game crashed. The give
+  now restores both itself, as the bag's party-menu items have it done
+  (bank 4 has no room for the bag to do it). Test:
+  `test_held_items.test_give_puts_the_field_back`; TAKE from the party menu
+  was checked in the emulator and was fine.
+
+- **Phase 3 fixes** (soak tests, `docs/verification_plan.md`):
+  - X Accuracy and one-hit KO moves (Shin's bug): `OneHitKOEffect_` lets
+    an X Accuracy user hit though slower, but the player's turn jumped past
+    that check. The same mon's move then went two ways on the two games of
+    a link battle, one drawing a random number the other didn't, and every
+    turn after differed. Both sides now check. Test:
+    `test_move_effects.OneHitKOTest`.
+  - Mystery Berry in link battles: each game spends only its own player's
+    PP, so the other never saw the move run out and kept the berry. The
+    berry is off in link battles. Test:
+    `test_held_item_battle.test_mystery_berry_not_in_link_battles`.
+
+- **Phase 5** (builds, display modes, saves, SameBoy; details in
+  `docs/verification_plan.md`): every build ran the phase 2-4 scripts
+  without a game bug. One text fix: the COLOR FIX help said "Darker colors";
+  Shin's gamma shader lightens and softens the picture (measured on every
+  scene), so it now says "Softer colors for backlit screens." The emulator
+  scripts now read map objects through the build's `IF DEF` branches (the
+  Japanese Red and Green keep the original Japanese layouts, so their
+  Mewtwo stands elsewhere). New tests: all 12 boxes full through a save
+  and load, and a damaged save refused
+  (`test_pc_boxes.SaveTest`).
+
+## Randomizer
+
+A randomizer for doors, key items, the other found items and marts, with a
+seed players can share, and levels that scale down when a shuffled world
+sends a player somewhere early. It follows the original Game Boy
+randomizers' shape (the world is built on the console from a seed) rather
+than patching ROMs on a computer.
+
+- **Options** (RANDOMIZER page, all off): DOORS, KEY ITEMS, ITEMS, MARTS,
+  and Shin's RANDOM WILD and RANDOM TRNR, moved there from EXTRAS. The first
+  four are `wRandoFlags` bits (saved; carried over NEW GAME and NEW GAME+)
+  and can only be changed from the title screen: from the start menu
+  (`wOptionsInGame`) the setters refuse with a buzz. DOORS turns KEY ITEMS
+  on and KEY ITEMS off turns DOORS off: with the key items where they were,
+  a door shuffle almost never gives a world that can be finished (147 of 150
+  tries failed: Bill behind Cut, Cut behind Bill's ticket, and so on).
+- **The seed.** At NEW GAME, if anything is randomized, a SEED? naming
+  screen (`NAME_SEED_SCREEN`, ten letters). The text and a settings byte
+  (the four choices, RANDOM WILD's two bits, RANDOM TRNR) are hashed
+  (FNV-1a's start, each byte xored in and stirred with the generator's
+  xorshift32) into `wRandoSeed`, so different settings never share a world.
+  Nothing typed: a random seed. A typed seed also gives Shin's wild
+  randomizer its one-byte seed and (`RandoReadTrainer`) seeds RANDOM TRNR
+  per trainer from the seed, class and number, putting the game's own
+  random numbers back afterwards. `randomizer.seed_hash` computes the same.
+- **The world model** (`tools/rando/`, README there): read from the built
+  ROM, so each layout gets its own (Red/Blue/Blue-JP, and Red-JP/Green with
+  the original Japanese maps). Squares and moves (ledges, Cut, Surf,
+  Strength, the tile-pair rules) become regions, then a compressed graph of
+  497 nodes and 721 edges whose requirements are single atoms (badges,
+  events, items, HMs). Scripted rules are written out in `logic.py`.
+- **What stays put**: Red's house, Oak's lab, the Viridian mart (Oak's
+  Parcel), the elevators, and the lobby to Hall of Fame chain. The S.S.
+  Anne with its dock, the Safari Zone, Silph Co., the Rocket Hideout,
+  Victory Road, Seafoam Islands and the Pokémon Mansion keep their insides
+  (puzzles, a ship that sails, a timed game); only their ways out are
+  shuffled. Outside doors pair with insides, stairs between inside maps with
+  each other, always both ways.
+- **The algorithm** (`randomizer.py`, the reference): the door shuffle grows
+  the world from the start, pairing a slot not yet reached with an open one
+  (dead ends first while there are doors to spare, then places that open
+  more), then pairs what is left; key items by assumed fill (the twelve the
+  logic needs first, then the others anywhere a key item may go), the rest
+  shuffled into the free locations; then two checks: the game can be
+  finished, and no place a player can walk into (round by round as items
+  come) leaves it unfinishable. Any failure: try again with the next random
+  numbers. With ITEMS off, each location keeps its item where it can and
+  the items key items pushed out go, in order, where the key items were.
+  Hidden items and the Pokédex-count aides never hold key items.
+- **On the Game Boy** (`engine/rando/`, banks $36-$38): `generator.asm`,
+  `doors.asm` and `items.asm` port the reference step for step, the same
+  random numbers in the same order, so `tests/test_rando.py` can demand the
+  same doors, items and number of tries for each mode and both layouts.
+  The searches (`core.asm`) are assembled twice (`{RP}` label prefix), in
+  the generator's bank and in the softlock check's, each with its own copy
+  of the graph. They work in save RAM bank 1 (`sRando*`, a union for the
+  scratch) and use `wOverworldMap` as their stack. A search takes the
+  events and locations it reaches and follows what they open from the nodes
+  already reached (per-atom source lists), so it runs once through the
+  world however much it gains. The door shuffle keeps each slot's "more to
+  reach" bits until a slot in its area is reached (`RandoKindsBack`).
+- **Saving**: only the seed and the choices are in the save (the five
+  unused bytes after `wRandomizerSeed`). The world (pairings, placements)
+  lives in save RAM bank 1 with a tag; CONTINUE builds it again if the tag
+  isn't the save's. Building takes about 1,250 frames on a Game Boy for a
+  world found on the first try (1.9 tries on average, at most 9 in 200
+  seeds), half that in a Game Boy Color's double speed, which it switches
+  to for the build.
+- **In the game** (`runtime.asm`): `WarpFound2` sends a shuffled warp to its
+  partner's arrival; item balls, hidden items and the 17 gifts
+  (`rando_gift`) give the placed item; marts build their list from the seed
+  when they open (`RandoMart`: what every mart sells, then picks from the
+  pool, nothing stored). The gifts' texts now name the item given
+  ("received HM02!" was fixed text; "an S.S.TICKET" loses its article).
+  With DOORS: the S.S. Anne's sailor always takes the ticket (the dock may
+  be a way through after the ship has left), the lobby's door to the Elite
+  Four needs all eight badges (Route 23's guards no longer see to it), and
+  a Pokémon Center sets its own town for blackouts (`wLastMap` may be a
+  route).
+- **Levels scale down** in shuffled worlds (DOORS or KEY ITEMS): a trainer's
+  Pokémon more than 2 levels (a boss's 3) above the party's highest, and a
+  wild one above it, comes down to it, and to its pre-evolution while it
+  couldn't have evolved at that level (`RandoDevolve`, from the evolution
+  data; stones and trades count as level 30). Only down, only then; Shin's
+  SCALING still raises levels and is its own option.
+- **Known limits**: the HM gift people's later lines ("HM02 is FLY") and
+  the fishing gurus' "take this and fish" still describe the vanilla gift;
+  the fishing hotkey hint shows whatever was given.
+- **Fixed during the work** (not released): the options change first pushed
+  `wRandoFlags` in NEW GAME+ without popping it; the NEW GAME+ tests caught
+  the crash.
+- **Tests**: `tests/test_rando.py` (generator against the reference for every
+  mode, both layouts; the seed hash; warps, balls, hidden items, gifts and
+  marts looked up; seeded trainers; scaling; choices kept over NEW GAME),
+  `tests/test_options.py` (the page, DOORS and KEY ITEMS together, the
+  lock). In the emulator: NEW GAME with a typed seed builds the same world
+  as the reference (DMG and GBC timings above), and `tools/emu/rando_walk.py`
+  walks through the doors of four towns and back.
+
+### The Pokémon options (RANDOM #MON page)
+
+Ideas from UPR FVX's options that fit Gen 1 and this fork (its code isn't
+used). Unlike the world, nothing here is built ahead or stored: every answer
+is drawn when the game needs it from the seed and what it is for
+(`RandoKey`: a kind, then up to three bytes such as the trainer, its number
+and the place in the party), so the same seed always gives the same
+Pokémon, and the save holds only the choices (`wRandoFlags2`, `wRandoFlags3`,
+in the old "unused space" of the progress flags; carried over NEW GAME and
+NEW GAME+; hashed into the seed with the rest). Code in
+`engine/rando/mons.asm` (bank $38); the tables it reads (each species'
+types, base stat total / 4 and kind; the three-stage lines and the
+"triangles" among them; each trainer's type theme; the wild encounter
+groups; each move's type and whether it does damage; the TMs' moves) are
+written by `gen_data.py` from the ROM through `tools/rando/mons.py`.
+
+- **Picking.** `RandoSimilar` draws among the species `sRandoWant` allows
+  (flags, a type, a range of base stat totals): within an eighth of the
+  original's total, else a quarter, else any; legendaries only for
+  legendaries. `RandoPermute` is a keyed shuffle of 0-n cheap enough to run
+  per species (four rounds of odd-multiply-add and xorshift on a byte,
+  repeated until below n): Shin's TIER and FULL wild swaps use it with the
+  whole seed (their own had a one-byte seed: 255 games), WILD AREA uses it
+  for its decks, TM MOVES for the TMs. Moves are drawn by trying random
+  bytes until one fits (`RandoLearnMove`), as counting them is too slow.
+- **Starters**: a vanilla starter's line maps to the same stage of the
+  line in its slot (`RandoStarterMon`), so OAK's balls, the rival's ball and
+  all the rival's teams follow. TYPES picks one of the precomputed ordered
+  triangles (27 among Gen 1's sixteen three-stage lines: a beats b beats c
+  beats a, by the first types, each one-way). OAK says "So! You want X?"
+  when the starters aren't the originals (Shin's random starters too).
+- **Trainers ALL** (`RandoTrainerMon`, before each `AddPartyMon`): themes are
+  the type a vanilla team shares (the first one's first, unless NORMAL),
+  fixed for the gym leaders and the Elite Four; then Shin's
+  `EnemyMonEvolve` and the scale-down. Gen 1 has one Ghost line and one
+  Dragon line, so Agatha and Lance field five of the same. With ALL Shin's
+  own regular-trainer randomizer is off (the two are one option's values).
+- **Wild AREA**: an encounter slot's number (`RandoWildGroups`: the map's
+  group, times ten, plus the slot) picks from the deck of basic Pokémon but
+  the legendaries; every run of the deck's size numbers is a whole shuffle,
+  so with 550 land slots each of the ~70 basics is somewhere. Surfing and
+  fishing draw from the Water-type basics. `RandoAreaLocations` answers the
+  Pokédex's AREA by working out each slot's place against the species'
+  basic's place in the deck (no species lookups: fast enough).
+- **SPECIAL MON**: one per Pokémon per map per seed, at each site that names
+  a one-off Pokémon (`rando_special`), and at `InitBattleEnemyParameters`
+  for the ones standing on the map (legendaries, the Power Plant's). The
+  dojo names its gift; the Lapras, Eevee and Magikarp people's own lines
+  and the legendaries' cries still are the originals'.
+- **TRADES**: both sides of each trade, similar strength.
+- **TMs**: TM MOVES shuffles every move but the HMs' into the 50 TMs (the
+  p-th such move is p + 1 plus one per HM move at or below it, so the
+  inverse is quick). TM COMPAT. answers per Pokémon per machine; the HMs keep
+  their own compatibility (the world's logic needs Cut and the rest) unless
+  FULL.
+- **Learnsets**: each (Pokémon, move) maps to one move, damaging for
+  damaging. The readers that matter take it: level-up learning and
+  `WriteMonMoves` (wild and trainer movesets) through `rando_learnset`, a
+  copy in `wRandoLearnset`; the MOVES screen; and the starting moves, made in
+  place in `GetMonHeader`. Breeding's inherited moves and the trainers'
+  set special moves are as they were.
+- **Costs**: TRAINERS ALL adds about 20 frames to a battle's start (Lorelei:
+  12 to 33 frames to read her team). A trainer test driver that waits for
+  the battle with a short idle limit needs more patience
+  (`tools/emu/rando_mons.py`).
+- **Tests**: `tests/test_rando_mons.py` (starters, trainers, wild, special,
+  trades, TMs, learnsets: the rules each promises, determinism, off is
+  off); `tests/test_options.py` (the page, the lock, the fields). In the
+  emulator, `tools/emu/rando_mons.py` with every option on: the Lapras and
+  dojo gifts, Snorlax, Mewtwo (a legendary), and the Elite Four (each keeps
+  its type) all played through.
+
+## Playtest round after the randomizer
+
+Bugs reported in play, and what came of each.
+
+- **Day care: the withdraw menu (two mons, CANCEL) had the sprites over
+  it.** `DayCareChooseMon` drew its box without updating the sprites, which
+  hide only on `UpdateSprites` when a text-box tile is under them. It now
+  updates them after drawing and after restoring the screen.
+- **A caught mon's pic came back after a level-up stats box.** With EXP.
+  SHARE on, a benched mon leveling up from the catch's EXP closed its stats
+  box by restoring screen buffer 1, saved before the catch, pic and all.
+  `CaughtMonExperience` now clears the pic area and saves the buffer first.
+  Emulator check: `tools/emu/catch_exp.py` (old build: the pic returns).
+- **The aide said "an DEXREPEL".** Now "the DEXREPEL".
+- **Forewarn named FOREWARN, not the move.** The move's name went into
+  `wcd6d`, then the ability banner put the ability's name there. The banner
+  now comes first. Test: `test_ability_entry.py`.
+- **Dragon Rage didn't teach TYPE HINT: LEARNED the Dragon matchups**, and
+  its own mark stayed "?". Fixed-damage moves (power 1) recorded nothing.
+  They now record their type's matchups like any attacking move (the type
+  still decides whether they hit), without a "super effective" line and
+  without the critical-hit text. Test: `test_type_chart.py`.
+- **A mon that exploded stayed in through the other side's move.** Gen 1
+  caught it in `HandlePoisonBurnLeechSeed` between the two moves; moving the
+  residuals to the end of the round (Gen 4+) lost that check. After the
+  first mover's move, a 0-HP mover now faints at once (Explosion, recoil,
+  either side). Emulator check: `tools/emu/explode_check.py`.
+- **Objects in the Rocket Hideout gave Pokémon Center text** (a grunt on
+  B1F, the TM ball on B2F, no randomizer). The EXTRAS option PC IN MENU
+  called `ActivatePC` straight from the start menu. The Pokémon Center's PC
+  goes through `PrintPredefTextID`, which saves the map's text pointer in
+  `$ffec`, and CHANGE BOX's save takes it back from there; from the menu,
+  `$ffec` held a stale value (often 0: `CheckForHiddenObject` clears it), so
+  after a box change the map's text pointer table was garbage until the next
+  map, and people and item balls read other texts, the nurse's among them.
+  The menu's PC now saves the pointer the same way and restores it after.
+  Emulator check: `tools/emu/menu_pc_check.py`. (The first pass, picking up
+  every item without the PC, couldn't find it.)
+- **Badge boosts are back** (see Gen 9 rules pass, part 4), with CHALLENGE >
+  BADGE BOOST to turn them off.
+
+### Item descriptions in the bag
+
+- **Layout.** The bag uses the whole screen: the pocket header on rows 0-2,
+  four entries of two rows from row 4 (`BAG_ROWS`, six before), and a box on
+  rows 13-17 with two lines on the entry under the cursor, as in Gold and
+  Silver ("Close the bag." on CANCEL). The screen is redrawn whole on each
+  cursor move already, so the box follows the cursor for free.
+- **Code and space.** The bag's bank had 3-5 bytes free, so the header (the
+  pocket's name, `PocketNames`) and the description box moved to their own
+  floating section, `engine/menu/item_descriptions.asm`, which
+  `BagDrawScreen` reaches with one `callba BagDrawFrame`; that freed more
+  than the call costs.
+- **Text.** `data/item_descriptions.asm`: a pointer per item number (0 for
+  the badges, the floors and the coin, which never are in the bag) and two
+  lines of at most 18 tiles each, 128 items, written to this game's rules
+  (Gen 9 held items, the vitamins' EVs, the Mist Stone and M.GENE, the
+  DEXREPEL). Test: `tests/test_item_descriptions.py` (every bag item has
+  two lines that fit).
+- **Shops.** The BUY list shows the same two lines on the entry under its
+  cursor, in the text box under the list ("Take your time." went), "Done
+  shopping." on CANCEL, and for a TM or HM "Teaches the move" and its move
+  (through `RandoTMMoveFar`, so TM MOVES shows the shuffled one). The list
+  menu moves its cursor inside `HandleMenuInput` (bank 0), so that loop
+  calls `MenuItemDescription` after placing the cursor: 12 bytes of bank 0
+  that do nothing unless `wMartDescriptions` is set, which the mart sets
+  only around the BUY list's `DisplayListMenuID` (the quantity and yes/no
+  menus that follow use `HandleMenuInput` too, so the list type wouldn't
+  do). `MartDrawDescription` is in the descriptions' section.

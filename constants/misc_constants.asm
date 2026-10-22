@@ -175,6 +175,7 @@ RARE_CANDY_MSG   EQU $F8
 NAME_PLAYER_SCREEN EQU 0
 NAME_RIVAL_SCREEN  EQU 1
 NAME_MON_SCREEN    EQU 2
+NAME_SEED_SCREEN   EQU 3 ; the randomizer's seed (10 letters, like a nickname)
 
 ; mon data locations
 ; Note that some values are not supported by all functions that use these values.
@@ -287,3 +288,25 @@ DEF HP_PERCENT_TILE		EQU $D0			; its two tiles, $D0 and $D1
 DEF NUM_CHART_TYPES		EQU 19
 DEF GEN2_PIC_HEADER_LENGTH	EQU 6			; Gen2PicHeaders' entries
 
+
+; wRandoFlags: what the randomizer shuffles (engine/rando/)
+RANDO_DOORS_F  EQU 0 ; the doors (and so the key items too)
+RANDO_KEYS_F   EQU 1 ; where the key items are
+RANDO_ITEMS_F  EQU 2 ; the other items on the ground and given
+RANDO_MARTS_F  EQU 3 ; what the marts sell
+RANDO_SEEDED_F EQU 7 ; a seed was given: wild and trainer #MON follow it
+RANDO_WORLD    EQU (1 << RANDO_DOORS_F) | (1 << RANDO_KEYS_F) | (1 << RANDO_ITEMS_F)
+
+; wRandoFlags2: the randomizer's #MON
+RANDO2_STARTERS    EQU %11  ; 0 off, 1 random lines, 2 lines whose types beat each other in turn
+RANDO2_STARTERS_F  EQU 0
+RANDO2_SPECIAL_F   EQU 2    ; gift, legendary and other one-off #MON
+RANDO2_TRADES_F    EQU 3    ; in-game trades
+RANDO2_TRAINERS_F  EQU 4    ; RANDOM TRNR ALL: every trainer, themes kept
+RANDO2_WILD_AREA_F EQU 5    ; RANDOM WILD AREA: each encounter slot its own
+; wRandoFlags3: moves
+RANDO3_TM_MOVES_F  EQU 0    ; what each TM teaches (HMs stay)
+RANDO3_TM_COMPAT   EQU %110 ; 0 off, 1 by type, 2 random, 3 every #MON
+RANDO3_TM_COMPAT_F EQU 1
+RANDO3_LEARN       EQU %11000 ; 0 off, 1 by type, 2 random, 3 METRONOME only
+RANDO3_LEARN_F     EQU 3

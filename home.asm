@@ -653,6 +653,7 @@ GetMonHeader::
 	ld bc, MonBaseStatsEnd - MonBaseStats
 	call CopyData
 	callab Gen2PicHeader ; Crystal's pics instead, with the option on
+	callba RandoHeaderMoves ; LEARNSETS' first moves
 	jr .done
 .specialID
 	;joenote - dynamically get pic size of special ID
@@ -2739,7 +2740,7 @@ InitBattleEnemyParameters::
 	ret
 .noTrainer
 	ld [wCurEnemyLVL], a
-	ret
+	jpba RandoSpecialBattle ; SPECIAL MON
 
 GetSpritePosition1::
 	ld hl, _GetSpritePosition1
@@ -4055,6 +4056,15 @@ WriteOAMBlock::
 	ld [hli], a
 	ret
 
+; the shop's buy list: two lines on the item under the cursor, as the bag
+; shows (engine/menu/item_descriptions.asm). HandleMenuInput keeps no
+; register across it
+MenuItemDescription:
+	ld a, [wMartDescriptions]
+	and a
+	ret z
+	jpba MartDrawDescription
+
 HandleMenuInput::
 	xor a
 	ld [wPartyMenuAnimMonEnabled], a
@@ -4073,6 +4083,7 @@ HandleMenuInput_::
 	xor a
 	ld [wAnimCounter], a ; counter for pokemon shaking animation
 	call PlaceMenuCursor
+	call MenuItemDescription ; the shop's buy list
 	call Delay3
 .loop2
 	push hl

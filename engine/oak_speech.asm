@@ -9,6 +9,12 @@ SetDefaultNames:
 	push af
 	ld a, [wDisplayOptions] ; and the sprites option
 	push af
+	ld a, [wRandoFlags] ; and what the randomizer shuffles
+	push af
+	ld a, [wRandoFlags2]
+	push af
+	ld a, [wRandoFlags3]
+	push af
 	callba SaveRuleFlags ; and the rules, which are event flags
 	ld hl, wPlayerName
 	ld bc, wMainDataEnd - wPlayerName ; the box is in save RAM now
@@ -19,6 +25,12 @@ SetDefaultNames:
 	xor a
 	call FillMemory
 	callba RestoreRuleFlags
+	pop af
+	ld [wRandoFlags3], a
+	pop af
+	ld [wRandoFlags2], a
+	pop af
+	ld [wRandoFlags], a
 	pop af
 	ld [wDisplayOptions], a
 	pop af
@@ -81,6 +93,7 @@ OakSpeech:
 	call SetDefaultNames
 	predef InitPlayerData2
 .newgamedone
+	callba RandoNewGame ; a seed, and the world, if anything is randomized
 	call RunDefaultPaletteCommand	;gbcnote - reinitialize the default palette in case the pointers got cleared
 ;joenote - initialize hack version byte as well as...
 	ld a, HACK_VERSION
@@ -368,6 +381,12 @@ DoNewGamePlus: ;joenote - selective wram clearing for new game plus
 	push hl
 	ld a, [wDisplayOptions] ; and the sprites option
 	push af
+	ld a, [wRandoFlags] ; and what the randomizer shuffles
+	push af
+	ld a, [wRandoFlags2]
+	push af
+	ld a, [wRandoFlags3]
+	push af
 
 	ld hl, wPlayerName
 	ld bc, wMainDataStart - wPlayerName
@@ -406,6 +425,12 @@ DoNewGamePlus: ;joenote - selective wram clearing for new game plus
 
 	;skip clearing box pkmn data
 	
+	pop af
+	ld [wRandoFlags3], a
+	pop af
+	ld [wRandoFlags2], a
+	pop af
+	ld [wRandoFlags], a
 	pop af
 	ld [wDisplayOptions], a
 	;restore the player ID

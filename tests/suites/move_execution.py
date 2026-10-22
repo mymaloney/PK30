@@ -72,7 +72,10 @@ def setup(game, rng):
 
     for side in ("wPlayerBattleStatus", "wEnemyBattleStatus"):
         for i in (1, 2, 3):
-            game.poke(f"{side}{i}", _battle_flags(rng))
+            flags = _battle_flags(rng)
+            if i == 1:
+                flags &= ~(1 << 5)  # unused (Gen 9's binding is wPlayerBoundTurns): never set in play
+            game.poke(f"{side}{i}", flags)
     for name in ("wPlayerMonAttackMod", "wEnemyMonAttackMod"):
         game.poke(name, *[rng.choice([7, 7, 7, rng.randint(1, 13)]) for _ in range(NUM_USED_STAT_MODS)])
     for name in ("wPlayerSubstituteHP", "wEnemySubstituteHP", "wPlayerDisabledMove", "wEnemyDisabledMove",
@@ -93,6 +96,8 @@ def setup(game, rng):
         if name in game.symbols:  # no abilities: those have their own tests
             game.poke(name, 0)
     game.poke("wObtainedBadges", 0xFF)  # otherwise mons over level 10 disobey
+    flags = game.addr("wEventFlags") + 0x8D2 // 8  # EVENT_NO_BADGE_BOOSTS: stats as set
+    game.poke(flags, game.peek(flags) | 1 << 0x8D2 % 8)
     game.poke("wPlayerMonNumber", rng.randint(0, PARTY_LENGTH - 1))
     game.poke("wPartyCount", PARTY_LENGTH)
     game.poke("wEnemyPartyCount", PARTY_LENGTH)

@@ -1,0 +1,250 @@
+# PK30 verification plan (v0.9.0)
+
+The goal is a ROM that can be played start to finish on all builds without
+a crash, a softlock, broken text or a wrong number, before calling it 1.0.
+
+What exists already: 399 unit tests in 53 files (`make test`). Almost all of
+them run single routines (battle maths, menus, items) on the Red build. What
+nothing checks yet is the game played as a whole: every map, script, trainer,
+item and NPC with this fork's data, the other builds, saves and the link.
+
+The plan runs from cheap and broad to slow and deep. Each phase ends with its
+findings written up in `docs/design_brief.md` (fixed bugs with a test), and
+anything I can't fix alone goes to you.
+
+## Phase 1: static checks (whole ROM, no emulator)
+
+Fast scripts that read the source or the built ROM and catch whole classes
+of mistakes at once. Each becomes a test so it stays checked.
+
+1. **Builds**: all 8 ROMs build with no warnings; `tests/compare_builds.py`
+   shows only the expected differences between them.
+2. **Space**: free bytes per ROM bank, WRAM, HRAM and SRAM; no bank within a
+   few bytes of full (bank 3 and 4 already are).
+3. **Data validity**: every learnset, TM/HM list, evolution, egg move,
+   trainer party, wild table, mart, gift and trade names a real species,
+   move or item, at a legal level; no trainer mon knows a move it can't.
+4. **Text**: every string fits its box (18 columns, line counts), move,
+   ability, item and type names fit every screen they appear on.
+5. **Flags and memory**: no event flag, WRAM or SRAM byte claimed twice
+   (this fork's `$8CC`-`$8D1` against Shin's); the save checksum covers every
+   saved byte this fork added.
+
+## Phase 2: automated sweeps (emulator, every map and NPC)
+
+Scripts that visit everything instead of playing it.
+
+1. **Map sweep**: warp into every map; check it loads, the player can move,
+   and no tile, sprite or palette is garbage (screenshot each one for a
+   quick visual pass).
+2. **NPC sweep**: talk to every person and sign on every map; every text
+   ends and returns control. Item balls and hidden items give what they say.
+3. **Trainer sweep**: start a battle with every trainer party in the game and
+   play a few AI-vs-AI turns: no crash, no invalid move, sensible damage.
+   Gym leaders, the rival and the Elite Four in full.
+4. **Wild sweep**: one encounter from every wild table (grass, water, each
+   rod), checking species and levels against the data.
+5. **Item sweep**: use every item from the bag, in and out of battle, on a
+   valid and an invalid target.
+
+## Phase 3: soak tests (long random runs)
+
+1. **Battle soak**: thousands of random battles (random mons, moves,
+   abilities, held items, statuses, both sides AI) with invariants checked
+   every turn: HP within 0..max, PP and stat stages in range, no stack
+   overflow, no stray jump, battle ends. Run with the options on and off
+   (EXP. SHARE, HP PERCENT, TYPE HINT, the clauses and challenges).
+2. **Link soak**: extend the link mirror test so both games run the same
+   random battles and must agree on every turn.
+3. **Breeding soak**: many eggs from random compatible pairs: legal species,
+   moves and IVs, hatches at level 1.
+
+## Phase 4: story checkpoints (emulator, scripted)
+
+Drive the main story's key events with scripts and save states, so each can
+be rerun after any fix: starter and rival, Oak's parcel, each gym and badge,
+Mt. Moon fossils, S.S. Anne and HM01, Rock Tunnel (Flash and darkness),
+Pokémon Tower and the Silph Scope, Silph Co., Safari Zone, the Game Corner,
+Cinnabar, Victory Road, the Elite Four and Hall of Fame, then NEW GAME+ and
+the post-game (Cerulean Cave, Mewtwo, Mew). Each checkpoint is saved and
+loaded once to test the save.
+
+## Phase 5: builds, hardware modes and saves
+
+1. **Every build**: run the unit tests and a short story slice on Blue,
+   Green, Red-JP, Blue-JP and the `_origback` builds, not only Red.
+2. **Display modes**: Game Boy Color, original Game Boy (DMG) and Super Game
+   Boy palettes and borders, with COLOR FIX and MORE COLOR on and off.
+3. **Saves**: save and load from every menu that can, all 12 PC boxes full,
+   a save made mid-NEW GAME+, and the "old save" refusal.
+4. **Another emulator**: run the checkpoints in a second accurate emulator
+   (SameBoy or mGBA, if they can be installed here) next to PyBoy. BGB on
+   your side remains the reference.
+
+## Phase 6: your playtest
+
+You play; I keep the pipeline ready to take whatever you find:
+
+- **Report**: what happened, where, and the build, plus a save or a BGB
+  save state if you can. A screenshot helps for anything visual.
+- **For each report** I reproduce it in the emulator, write a test that
+  fails, fix it, and add it to the design brief.
+- **Checklist**: a short list of what is new and worth poking at, in story
+  order, so the playtest also covers what the scripts can't judge (feel,
+  balance, text tone, music).
+
+## Order and status
+
+| Phase | Effort | Status |
+|---|---|---|
+| 1 Static checks | small | done (below) |
+| 2 Sweeps | medium | done (below) |
+| 3 Soak tests | medium | done (below) |
+| 4 Story checkpoints | large | done (below) |
+| 5 Builds, modes, saves | medium | done (below) |
+| 6 Playtest support | ongoing | ready |
+
+Phases 1-3 need no input from you and find the most per hour, so they go
+first. Phase 4 is the slowest to build but gives a rerunnable playthrough.
+
+## Phase 1 results
+
+- **Builds**: all 8 build with no warnings (the Makefile's deprecated
+  `rgbgfx -h` is now `-Z`).
+- **Space**: `tools/space_report.py` prints each bank's free bytes from the
+  link maps. About 236 KB of ROM is free (10 empty banks and slack), 476
+  bytes of WRAM, and the last WRAM variable ends at `$dd25`, 730 bytes clear
+  of the stack. Many of Shin's banks are within a few bytes of full, which
+  only matters for code added to them.
+- **Data**: `tests/test_data_integrity.py` reads every trainer party with
+  the game's own `ReadTrainer` (as written, with the alternative movesets,
+  scaled to a level 50 and a level 100 team, and randomized), every wild
+  table, mart, in-game trade and evolution from the built ROM. It found one
+  bug, fixed: a special trainer move the mon already knew gave it that move
+  twice (Bruno's first Onix, with DIG twice, from this fork's learnsets;
+  Sabrina and Koga with Shin's level scaling on).
+- **Text**: `tools/text_lint.py` (and `tests/test_text_fit.py`) follows the
+  text commands with the game's charmap and finds lines wider than the
+  18-column box in the worst case. It found 16 of this fork's battle
+  messages that ran past the box when the line began with an enemy's name
+  ("Enemy " and up to 10 letters): all rewritten.
+- **Flags and saves**: this fork's event flags ($8CC-$8D1) were unused in
+  Shin. Everything it keeps between sessions is in the saved, checksummed
+  block, now including the last repel used (it was outside, so a game
+  loaded mid-repel couldn't offer another when it wore off); tested in
+  `SaveLayoutTest`.
+
+## Phase 2 results
+
+Emulator sweeps (PyBoy, the Red build, from a new game with a test party):
+
+- **Maps**: all 226 maps entered through a steered fly warp (any map, a
+  door or the middle as the spawn): every one loads, runs the overworld
+  loop and draws correctly (a contact sheet of all of them was checked by
+  eye). Six couldn't be walked out of from the spawn chosen (the sea on
+  Routes 19 and 21, the Cerulean Cave door, boulders on Seafoam B4F, a
+  hemmed-in Saffron door, the Hall of Fame cutscene): all spawn artifacts.
+- **People and signs**: all 1,146 texts opened through `DisplayTextID` and
+  pressed through: 801 end and return to the field, 339 start their trainer
+  battle, 6 run long or wait on an entry cutscene (Lance, the Hall of Fame)
+  that ignores the joypad, all checked. The 4,240 lines of dialogue shown
+  have no unknown tile.
+- **Trainers**: all 362 parties battled to the end with each enemy mon
+  acting: only real moves, no unknown tile in any battle text, no crash.
+- **Items**: all 137 items used from the bag in the field and in a wild
+  battle. Two bugs, fixed:
+  - Giving a held item left sprite updates off and the map's sprite tiles
+    overwritten (reported in the playtest too): the player vanished and
+    couldn't move, or the game crashed.
+  - "PIKACHU is now holding FOCUS BAND." ran past the box (the text
+    checker missed lines continuing after an inserted name; it now follows
+    them, and found one more edge: "<PLAYER> got ¥" with a 7-letter name
+    and 6 digits of prize money).
+
+## Phase 3 results
+
+- **Battle soak** (PyBoy, the Red build): 750 whole battles, 13,420 turns,
+  with random player parties made by the game's own `AddPartyMon` (random
+  species and levels, moves from their learnsets, held items, ability
+  slots), against random trainer parties or wild mons, each with random
+  options (EXP. SHARE, HP PERCENT, TYPE HINT, every clause, hard mode,
+  SET/SHIFT, animations, Shin's trainer options). Checked every turn: HP
+  within max on both sides and in the party, stat stages 1-13, real moves;
+  throughout: no jump to the crash vector, no code run from RAM, and the
+  deepest stack use (100 bytes, to `$df9b`; WRAM ends at `$dd25`). 741
+  battles ended; 9 ran past the time limit and were checked by eye (stalls:
+  Minimize and Acid Armor, a disobedient high-level mon). No crash.
+  - One finding, harmless and Shin's: a trainer mon's party copy keeps the
+    max HP worked out without its EVs while the battle copy has them, so
+    the party copy's HP can read a few points over its max after it has
+    been out. The battle copy is recalculated whenever it comes in, so
+    nothing shows.
+  - A crash found early was the test's: it had picked one of the
+    pictures-only species (FOSSIL_KABUTOPS), which no party can hold.
+- **Link soak** (`tests/soak_link.py`): the mirror test on 11,000 more seeds
+  with random abilities, moves and held items. Two real desyncs, fixed:
+  X Accuracy with a one-hit KO move (Shin's), and the Mystery Berry. The
+  last 4,000 seeds all agree.
+- **Breeding soak** (`tests/soak_breeding.py`): 2,042 eggs from random
+  breedable pairs (genders, moves, IVs, abilities, Everstones, trainer IDs),
+  made with the game's own random numbers: every one the right species,
+  level 1, no HP, its egg cycles, real moves with full PP, none twice, all
+  ones it may have, and a valid ability slot.
+
+## Phase 4 results
+
+Scripted checkpoints (`tools/emu/`, rerunnable): each sets the flags, badges,
+bag and party a player would have, enters the map, walks up to the person (or
+onto the trigger) and presses A as a player would, plays the battle through,
+and checks the outcome. All 26 pass.
+
+- **Gym leaders** (all 8): the battle, the leader's flag, the badge, the TM
+  owned (the fork's TM flags, given through `GiveItem`), and the whole text
+  through "<PLAYER> received TMxx".
+- **Story events**: Mr. Fuji rescued and the Poké Flute; Giovanni in the
+  Rocket Hideout and the Silph Scope; the ghost Marowak; Giovanni at Silph Co.
+  (its trigger tiles) and the president's Master Ball; the Lapras gift; the
+  Fighting Dojo gift; the warden's Strength (HM04) for the Gold Teeth; the
+  Surf house (HM03); a fossil given, the island visited and Omanyte handed
+  over; Snorlax (Shin plays the flute when you talk to it); Mewtwo; the four
+  Elite Four rooms; the Champion, Oak, the Hall of Fame and its count.
+- **Saves**: saved from the start menu, reset, CONTINUE: the party, bag,
+  events, TMs, type chart, options, Pokédex, money and position all come back
+  (only Shin's "a save exists" flag changes, as saving sets it). NEW GAME+
+  (SELECT held on NEW GAME with the Elite Four beaten) keeps the TMs, type
+  chart, Pokédex and options, clears the party, badges and story flags, and
+  starts in Red's room.
+
+No game bug turned up in this phase; everything that failed on the way was
+the scripts (a gym trainer spotting the player first, a locked Silph gate,
+the walking fossil scientist, a misread flag list).
+
+## Phase 5 results
+
+- **Every build**: all 8 pass the unit tests. Blue, Green, Red-JP, Blue-JP
+  and Red on an original Game Boy (DMG mode in PyBoy) each ran the whole of
+  phases 2 and 4: all 226 maps load and run (the same six spawn artifacts
+  as Red), all 8 gym leaders, all 17 story checkpoints, save and CONTINUE,
+  NEW GAME+, and all 137 items from the bag with no crash. The `_origback`
+  builds (back sprites only) ran 40 random battles each. One script fix: the
+  Japanese Red and Green keep the original Japanese layout of Cerulean
+  Cave's last floor, where Mewtwo stands at (5,10), not (27,13); the scripts
+  now read each map's objects through the build's `IF DEF` branches.
+- **SameBoy** (`tools/emu/sameboy_check.py`, an accurate emulator
+  independent of PyBoy, driven through `tools/emu/sbdrive.c`): a save made
+  in PyBoy is continued in SameBoy as a Game Boy Color, an original Game
+  Boy and a Super Game Boy; each plays a wild battle, gives a held item
+  ("is now holding LEFTOVERS."), walks, and saves, and that save continues
+  back in PyBoy with everything in place. All three pass. The screenshots
+  show the right palettes on each, and Red's Super Game Boy border.
+- **Display options** (`tools/emu/colors.py`): COLOR FIX and MORE COLOR in
+  all four combinations, on towns, a route, Viridian Forest, a battle and
+  the start menu: all draw correctly. COLOR FIX is kept through a save. Its
+  help text said "Darker colors"; the shader makes every scene lighter
+  and softer, so it now says "Softer colors for backlit screens."
+- **Saves**: all 12 boxes full (20 each) survive a save and load; a damaged
+  save (any changed byte in the main data) is refused with no CONTINUE;
+  a save made in NEW GAME+ continues
+  as NEW GAME+ with its kept TMs.
+
+No game bug turned up in this phase beyond the help text.

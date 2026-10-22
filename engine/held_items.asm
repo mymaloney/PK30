@@ -19,6 +19,40 @@ GetEnemyHeldItem:
 	ret
 .wild
 	push de
+	; ITEMS: another species' pair, one per species per seed
+	ld a, [wEnemyMonSpecies]
+	ld e, a
+	callba RandoWildHeldPick
+	ld a, e
+	cp $ff
+	jr z, .own
+	ld b, a
+	ld c, 0
+	ld hl, WildHeldItems
+.count
+	ld a, [hli]
+	inc hl
+	inc hl
+	inc a
+	jr z, .counted
+	inc c
+	jr .count
+.counted
+	ld a, b
+.mod
+	sub c
+	jr nc, .mod
+	add c                        ; the pair's number
+	ld b, a
+	add a
+	add b
+	inc a
+	ld c, a
+	ld b, 0
+	ld hl, WildHeldItems
+	add hl, bc
+	jr .found
+.own
 	ld a, [wEnemyMonSpecies]
 	ld b, a
 	ld hl, WildHeldItems
@@ -533,8 +567,13 @@ KingsRock:
 	ret z
 	jp StenchFlinch
 
-; MysteryBerry: a move left with no PP gets 5 back
+; MysteryBerry: a move left with no PP gets 5 back. Not in a link battle:
+; there each game spends only its own player's PP, so the other game would
+; never see the move run out, and the two would disagree on the berry
 MysteryBerry:
+	ld a, [wLinkState]
+	cp LINK_STATE_BATTLING
+	ret z
 	call UserItem
 	cp MYSTERYBERRY
 	ret nz
@@ -823,8 +862,9 @@ BerryPPRestoredText:
 	prompt
 
 LifeOrbText:
-	text "<USER> lost some"
-	line "of its HP!"
+	text "<USER>"
+	line "lost some of"
+	cont "its HP!"
 	prompt
 
 ChoiceLockedText:
@@ -939,7 +979,8 @@ LoadMartInventory:
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
-	jp LoadItemList
+	call LoadItemList
+	jpba RandoMart ; or the randomizer's list
 
 INCLUDE "data/mart_lists.asm"
 
