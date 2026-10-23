@@ -2408,8 +2408,9 @@ tileset (MART and POKECENTER share it).
   Gen 1's own) and
   `tests/test_room_tiles.py` checks every square of every map against Gen 1.
 - **The limit.** A Gen 1 tileset holds $60 tiles; the pilot uses 95.
-- **Choosing by eye.** `tools/room_picker.py` makes a page with every map of
-  the tileset, the candidates for any square (cycled with the arrow keys,
+- **Choosing by eye.** `tools/room_picker.py` makes a page that starts from
+  Gen 1's own rooms (the baseline; the committed picks load with a button)
+  and shows every map of the tileset, the candidates for any square (cycled with the arrow keys,
   or Crystal's whole blocks with shift), the tile and counter budgets kept
   as the converter counts them, and the picks file to copy back.
 - **First picks (by me, for review).** Crystal's Pokémon Center: its healing

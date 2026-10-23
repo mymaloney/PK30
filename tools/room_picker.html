@@ -63,7 +63,8 @@ textarea{width:100%;min-height:160px;font:.75rem var(--mono);background:var(--bg
   <span class="spacer"></span>
   <button type="button" id="gen1Toggle" aria-pressed="false">Show Gen 1</button>
   <button type="button" id="undo">Undo</button>
-  <button type="button" id="reset">Reset to file</button>
+  <button type="button" id="reset">Start over from Gen 1</button>
+  <button type="button" id="loadFile">Load committed picks</button>
   <button type="button" class="primary" id="copyTop">Copy picks</button>
 </div>
 
@@ -103,7 +104,7 @@ textarea{width:100%;min-height:160px;font:.75rem var(--mono);background:var(--bg
 <script>
 const D = /*DATA*/null;
 const SHADE = [[255,255,255],[170,170,170],[85,85,85],[0,0,0]];
-const KEY = 'room-picker-' + D.room;
+const KEY = 'room-picker-gen1-' + D.room;  // Gen 1 is the baseline
 const tileShades = D.atlas.map(s => Uint8Array.from(s, c => +c));
 const sqCache = new Map();
 function squareCanvas(i){
@@ -117,7 +118,7 @@ function squareCanvas(i){
   });
   ctx.putImageData(img,0,0); sqCache.set(i,c); return c;
 }
-let picks = D.blocks.map(b => b.pick.slice());
+let picks = D.blocks.map(b => b.orig.slice());
 try { const saved = JSON.parse(localStorage.getItem(KEY)||'null');
   if (saved && saved.length === picks.length && saved.every(p => p.length===4 && p.every(i => i < D.squares.length))) picks = saved; } catch(e){}
 const history = [];
@@ -141,12 +142,15 @@ function budget(){
   return {tiles: keys.size, counters: ctr.size};
 }
 
+const hex2 = b => b.toString(16).toUpperCase().padStart(2,'0');
 function refFor(s, q, b){
+  if (b !== undefined && s === D.blocks[b].orig[q]) return 'gen1:'+hex2(b);  // its own square, same corner
   if (b !== undefined && s === D.blocks[b].pick[q]) return D.blocks[b].names[q];
   const r = D.squares[s].ref, m = r.match(/^(?!frlg)([\w]+):([0-9A-F]{2})\.([0-3])$/);
   return m && +m[3]===q ? m[1]+':'+m[2] : r;
 }
 function pickText(b){
+  if (picks[b].every((s,q) => s === D.blocks[b].orig[q])) return 'gen1:'+hex2(b);
   if (picks[b].every((s,q) => s === D.blocks[b].pick[q])) {
     const n = D.blocks[b].names, m = n[0].match(/^(?!frlg)([\w]+):([0-9A-F]{2})$/);
     if (m && n.every(x => x === n[0])) return n[0];
@@ -212,7 +216,8 @@ function drawBlock(){
 
 // candidates
 const fromEl = document.getElementById('from');
-[['all','All tilesets'], ...D.groups.map((g,i) => [String(i), g])].forEach(([v,t]) => {
+const gen1Group = D.groups.length - 1;
+[['all','All tilesets'], [String(gen1Group), D.groups[gen1Group]], ...D.groups.slice(0,-1).map((g,i) => [String(i), g])].forEach(([v,t]) => {
   const o = document.createElement('option'); o.value = v; o.textContent = t; fromEl.appendChild(o); });
 fromEl.onchange = () => { from = fromEl.value; page = 0; render(); };
 function distance(a, b){ let d = 0; for (let k=0;k<4;k++){ const x = tileShades[D.squares[a].t[k]], y = tileShades[D.squares[b].t[k]]; for (let p=0;p<64;p++) d += Math.abs(x[p]-y[p]); } return d; }
@@ -291,7 +296,8 @@ document.getElementById('order').onchange = render;
 document.getElementById('pagePrev').onclick = () => { page = Math.max(0, page-1); drawCands(); };
 document.getElementById('pageNext').onclick = () => { page++; drawCands(); };
 document.getElementById('undo').onclick = () => { if (history.length){ picks = history.pop(); save(); render(); } };
-document.getElementById('reset').onclick = () => change(() => { picks = D.blocks.map(b => b.pick.slice()); });
+document.getElementById('reset').onclick = () => change(() => { picks = D.blocks.map(b => b.orig.slice()); });
+document.getElementById('loadFile').onclick = () => change(() => { picks = D.blocks.map(b => b.pick.slice()); });
 const g1t = document.getElementById('gen1Toggle');
 g1t.onclick = () => { showGen1 = !showGen1; g1t.setAttribute('aria-pressed', showGen1); render(); };
 async function copy(btn){
