@@ -28,7 +28,9 @@ so reusing tiles is how a room fits.
 ## Checking and building
 
 You need Python 3 with Pillow (`pip install pillow`) and the repository
-cloned with git. From the repository's folder:
+cloned with git (with its history: not `--depth 1`). From the repository's
+folder (on Windows the command may be `py` or `python` instead of
+`python3`):
 
 ```bash
 python3 tools/rooms.py            # check every room; build the ones that fit

@@ -32,6 +32,18 @@ from PIL import Image
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def read_text(path):
+    """a text file as UTF-8 (Windows would read it as cp1252)"""
+    with open(path, encoding='utf-8', errors='replace') as f:
+        return f.read()
+
+
+def write_text(path, text):
+    """UTF-8 with '\\n' line ends (Windows would write cp1252 and CRLF)"""
+    with open(path, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(text)
+
 # Gen 1 tileset constant -> the tileset file (data/tileset_headers.asm and
 # main.asm: several share one)
 GEN1_FILES = {
@@ -103,15 +115,15 @@ def gray_tiles(path):
 
 class Gen1:
     def __init__(self):
-        consts = open(os.path.join(REPO, 'constants/map_constants.asm')).read()
+        consts = read_text(os.path.join(REPO, 'constants/map_constants.asm'))
         self.dims = {m.group(1): (int(m.group(3)), int(m.group(2))) for m in
                      re.finditer(r'mapconst (\w+),\s*(\d+),\s*(\d+)', consts)}  # name -> (w, h)
-        main = open(os.path.join(REPO, 'main.asm')).read()
+        main = read_text(os.path.join(REPO, 'main.asm'))
         blk = dict(re.findall(r'^(\w+Blocks):\s*INCBIN\s+"([^"]+)"', main, re.M))
         self.maps = {}
         hdr_dir = os.path.join(REPO, 'data/mapHeaders')
         for f in sorted(os.listdir(hdr_dir)):
-            t = open(os.path.join(hdr_dir, f)).read()
+            t = read_text(os.path.join(hdr_dir, f))
             ts = re.search(r'db (\w+) ; tileset', t)
             dim = re.search(r'db (\w+)_HEIGHT', t)
             bl = re.search(r'dw (\w+Blocks)', t)
@@ -132,16 +144,16 @@ class Gen1:
 class Crystal:
     def __init__(self, root):
         self.root = root
-        consts = open(os.path.join(root, 'constants/map_constants.asm')).read()
+        consts = read_text(os.path.join(root, 'constants/map_constants.asm'))
         self.dims = {m.group(1): (int(m.group(2)), int(m.group(3))) for m in
                      re.finditer(r'map_const (\w+),\s*(\d+),\s*(\d+)', consts)}
-        attrs = open(os.path.join(root, 'data/maps/attributes.asm')).read()
+        attrs = read_text(os.path.join(root, 'data/maps/attributes.asm'))
         label_of = {m.group(2): m.group(1) for m in re.finditer(r'map_attributes (\w+), (\w+),', attrs)}
-        maps_asm = open(os.path.join(root, 'data/maps/maps.asm')).read()
+        maps_asm = read_text(os.path.join(root, 'data/maps/maps.asm'))
         tileset_of = dict(re.findall(r'^\s*map (\w+), TILESET_(\w+)', maps_asm, re.M))
         # blocks: several labels can share one file (data/maps/blocks.asm)
         blk_of, pending = {}, []
-        for line in open(os.path.join(root, 'data/maps/blocks.asm')):
+        for line in read_text(os.path.join(root, 'data/maps/blocks.asm')).splitlines():
             m = re.match(r'^(\w+)_Blocks:', line)
             if m:
                 pending.append(m.group(1))
@@ -400,7 +412,7 @@ def apply(g1, cr, chosen):
         if os.path.exists(path):
             write_png([frames[k % 2]], path, 1)
     lines.append('flower <- flower/dmg_1, flower/dmg_2')
-    open(os.path.join(REPO, 'tools/crystal_tiles_choices.txt'), 'w').write('\n'.join(lines) + '\n')
+    write_text(os.path.join(REPO, 'tools/crystal_tiles_choices.txt'), '\n'.join(lines) + '\n')
 
 
 # indoors: the Crystal tilesets Crystal's own Kanto rooms of the same kind use

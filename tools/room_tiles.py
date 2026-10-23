@@ -37,6 +37,7 @@ Gen 1's own tilesets are read from git (ORIGINAL), so this can be run again
 after editing the picks. The graphics are pret/pokecrystal's.
 """
 import collections
+import io
 import os
 import re
 import subprocess
@@ -45,7 +46,7 @@ import sys
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from crystal_tiles import REPO, gray_tiles, likeness, write_png  # noqa: E402
+from crystal_tiles import REPO, gray_tiles, likeness, read_text, write_png, write_text  # noqa: E402
 
 ORIGINAL = '4ba5456'  # the last commit with Gen 1's indoor tilesets as they were
 
@@ -68,7 +69,19 @@ WALKABLE = {'FLOOR', 'WARP_CARPET_DOWN', 'WARP_CARPET_UP', 'WARP_CARPET_LEFT', '
 
 
 def git_show(path):
-    return subprocess.check_output(['git', '-C', REPO, 'show', f'{ORIGINAL}:{path}'])
+    """a file as it was at ORIGINAL (Gen 1's rooms), from the repository's history"""
+    path = path.replace(os.sep, '/')  # (git wants / on Windows too)
+    try:
+        return subprocess.check_output(['git', '-C', REPO, 'show', f'{ORIGINAL}:{path}'])
+    except FileNotFoundError:
+        raise SystemExit('git not found: install git (and have it on PATH); Gen 1\'s rooms are read from the history')
+    except subprocess.CalledProcessError:
+        raise SystemExit(f'git could not read {path} at {ORIGINAL}: the clone needs its history '
+                         f'(not --depth 1; git fetch --unshallow)')
+
+
+def git_text(path):
+    return git_show(path).decode('utf-8', 'replace').replace('\r\n', '\n')
 
 
 def blocks_of(data):
@@ -83,17 +96,14 @@ class Gen1Room:
         self.talked_over = None  # counters_talked_over, when first needed
         consts = ROOMS[name]['constants']
         gen1 = ROOMS[name].get('gen1', name)
-        path = f'/tmp/gen1_{os.getpid()}_{name}.png'
-        open(path, 'wb').write(git_show(f'gfx/tilesets/{gen1}.png'))
-        self.tiles = gray_tiles(path)
-        os.remove(path)
+        self.tiles = gray_tiles(io.BytesIO(git_show(f'gfx/tilesets/{gen1}.png')))
         self.blocks = blocks_of(git_show(f'gfx/blocksets/{gen1}.bst'))
         self.walkable = set(git_show(f'gfx/tilesets/{gen1}.tilecoll').split(b'\xff')[0])
-        headers = git_show('data/tileset_headers.asm').decode()
+        headers = git_text('data/tileset_headers.asm')
         label = consts[0].title().replace('_', '')
         m = re.search(rf'tileset {label}_Block,.*?,\s*(\$\w+),(\$\w+),(\$\w+),', headers)
         self.counters = {int(x[1:], 16) for x in m.groups()} - {0xFF}
-        warps = git_show('data/warp_tile_ids.asm').decode()
+        warps = git_text('data/warp_tile_ids.asm')
         self.warps = set()
         for c in consts:
             label = c.title().replace('_', '') + 'WarpTileIDs:'
@@ -101,17 +111,17 @@ class Gen1Room:
             block = block[:block.index('\n\n')] if '\n\n' in block else block
             body = re.search(r'\tdb ([^\n]*)', block).group(1)
             self.warps |= {int(x.strip()[1:], 16) for x in body.split(',') if x.strip() != '$FF'}
-        doors = git_show('engine/overworld/doors.asm').decode()
+        doors = git_text('engine/overworld/doors.asm')
         self.doors = set()
         for c in consts:
             m = re.search(rf'dbw {c},\s*(\w+)', doors)
             if m:
                 body = re.search(rf'{m.group(1)}:\s*\n\s*db ([^\n]*)', doors).group(1)
                 self.doors |= {int(x.strip()[1:], 16) for x in body.split(',')} - {0}
-        colors = git_show('custom_functions/func_enhancedcolor.asm').decode()
+        colors = git_text('custom_functions/func_enhancedcolor.asm')
         body = colors[colors.index(f'PalSettings_{consts[-1]}:'):]
         self.colors = [int(v) for line in re.findall(r'^db\s+([^\n;]*)', body, re.M)[:6] for v in line.split(',')]
-        shelves = git_show('engine/hidden_object_functions3.asm').decode()
+        shelves = git_text('engine/hidden_object_functions3.asm')
         self.shelves = {}
         for c in consts:
             for t, text in re.findall(rf'db {c},\s*\$(\w+)\s*\n\s*db_tx_pre (\w+)', shelves):
@@ -127,9 +137,9 @@ class CrystalSet:
         self.name = name
         self.blocks = blocks_of(open(os.path.join(root, f'data/tilesets/{name}_metatiles.bin'), 'rb').read())
         self.tiles = gray_tiles(os.path.join(root, f'gfx/tilesets/{name}.png'))
-        coll = open(os.path.join(root, f'data/tilesets/{name}_collision.asm')).read()
+        coll = read_text(os.path.join(root, f'data/tilesets/{name}_collision.asm'))
         self.coll = [m for m in re.findall(r'tilecoll (\w+), (\w+), (\w+), (\w+)', coll)]
-        pal = open(os.path.join(root, f'gfx/tilesets/{name}_palette_map.asm')).read()
+        pal = read_text(os.path.join(root, f'gfx/tilesets/{name}_palette_map.asm'))
         names = []
         for part in re.split(r'rept 16\s*db \$ff\s*endr', pal):
             names.append([n for line in re.findall(r'tilepal \d, ([^\n;]*)', part) for n in line.replace(' ', '').split(',')])
@@ -147,19 +157,19 @@ class CrystalSet:
 
 def room_maps(name):
     """the maps with this room tileset: [(map, .blk path, width, height)]"""
-    main = open(os.path.join(REPO, 'main.asm')).read()
+    main = read_text(os.path.join(REPO, 'main.asm'))
     blk = dict(re.findall(r'^(\w+Blocks):\s*INCBIN\s+"([^"]+)"', main, re.M))
     # labels stacked on one INCBIN share it
     for group in re.findall(r'((?:^\w+Blocks:\s*\n)+)(^\w+Blocks):\s*INCBIN\s+"([^"]+)"', main, re.M):
         for label in re.findall(r'(\w+Blocks):', group[0]):
             blk[label] = group[2]
-    consts = open(os.path.join(REPO, 'constants/map_constants.asm')).read()
+    consts = read_text(os.path.join(REPO, 'constants/map_constants.asm'))
     dims = {m.group(1): (int(m.group(3)), int(m.group(2))) for m in
             re.finditer(r'mapconst (\w+),\s*(\d+),\s*(\d+)', consts)}
     out = []
     hdr_dir = os.path.join(REPO, 'data/mapHeaders')
     for f in sorted(os.listdir(hdr_dir)):
-        t = open(os.path.join(hdr_dir, f)).read()
+        t = read_text(os.path.join(hdr_dir, f))
         ts = re.search(r'db (\w+) ; tileset', t)
         dim = re.search(r'db (\w+)_HEIGHT', t)
         bl = re.search(r'dw (\w+Blocks)', t)
@@ -173,13 +183,13 @@ def border_blocks(name):
     """the blocks drawn past the edges of this room tileset's maps"""
     objects = {}
     for f in os.listdir(os.path.join(REPO, 'data/mapObjects')):
-        t = open(os.path.join(REPO, 'data/mapObjects', f)).read()
+        t = read_text(os.path.join(REPO, 'data/mapObjects', f))
         for label, b in re.findall(r'^(\w+Object):\s*\n\s*db \$?(\w+) ; border block', t, re.M):
             objects[label] = int(b, 16)
     out = set()
     hdr_dir = os.path.join(REPO, 'data/mapHeaders')
     for f in sorted(os.listdir(hdr_dir)):
-        t = open(os.path.join(hdr_dir, f)).read()
+        t = read_text(os.path.join(hdr_dir, f))
         ts = re.search(r'db (\w+) ; tileset', t)
         ob = re.search(r'dw (\w+Object) ; objects', t)
         if ts and ob and ts.group(1) in ROOMS[name]['constants'] and ob.group(1) in objects:
@@ -191,14 +201,14 @@ def map_people(name):
     """{map: ([(x, y) of each person], [(x, y) of each warp])} for this room tileset's maps"""
     objects = {}
     for f in os.listdir(os.path.join(REPO, 'data/mapObjects')):
-        t = open(os.path.join(REPO, 'data/mapObjects', f)).read()
+        t = read_text(os.path.join(REPO, 'data/mapObjects', f))
         for label, body in re.findall(r'^(\w+Object):(.*?)(?=^\w+Object:|\Z)', t, re.M | re.S):
             objects[label] = ([(int(x), int(y)) for x, y in re.findall(r'^\s*object \w+, (\d+), (\d+)', body, re.M)],
                               [(int(x), int(y)) for x, y in re.findall(r'^\s*warp (\d+), (\d+)', body, re.M)])
     out = {}
     hdr_dir = os.path.join(REPO, 'data/mapHeaders')
     for f in sorted(os.listdir(hdr_dir)):
-        t = open(os.path.join(hdr_dir, f)).read()
+        t = read_text(os.path.join(hdr_dir, f))
         ts = re.search(r'db (\w+) ; tileset', t)
         dim = re.search(r'db (\w+)_HEIGHT', t)
         ob = re.search(r'dw (\w+Object) ; objects', t)
@@ -337,7 +347,7 @@ def read_picks(name):
     path = os.path.join(REPO, f'tools/room_tiles/{name}.txt')
     picks, notes = {}, {}
     if os.path.exists(path):
-        for n, line in enumerate(open(path), 1):
+        for n, line in enumerate(read_text(path).splitlines(), 1):
             m = re.match(r'\s*([0-9A-Fa-f]{2})\s*<-\s*((?:\w+:[0-9A-Fa-f]{2}(?:\.[0-3])?\s*)+)(.*)', line)
             if not m:
                 continue
@@ -367,7 +377,7 @@ def write_picks(name, picks, notes):
     lines = [f'# {name}: Gen 1 block <- its four squares (see tools/room_tiles.py)']
     for b in sorted(picks):
         lines.append(f'{b:02X} <- {pick_text(picks[b]):<52} {notes.get(b, "")}'.rstrip())
-    open(path, 'w').write('\n'.join(lines) + '\n')
+    write_text(path, '\n'.join(lines) + '\n')
 
 
 def build(g1, src, picks):
@@ -447,14 +457,14 @@ def write(name, g1, built):
     for t, text in sorted(shelves.items()):
         out += [f'\tdb \\1, ${t:02X}', f'\tdb_tx_pre {text}']
     out.append('ENDM')
-    open(os.path.join(REPO, f'constants/rooms/{name}.asm'), 'w').write('\n'.join(out) + '\n')
+    write_text(os.path.join(REPO, f'constants/rooms/{name}.asm'), '\n'.join(out) + '\n')
     rows = [colors[i:i + 16] + [3] * (16 - len(colors[i:i + 16])) for i in range(0, 0x60, 16)]
     rows = [r if len(r) == 16 else [3] * 16 for r in rows]
     while len(rows) < 6:
         rows.append([3] * 16)
     col = [f'; {name}: MORE COLOR\'s color for each tile (tools/room_tiles.py)']
     col += ['db\t' + ',\t'.join(str(c) for c in r) for r in rows]
-    open(os.path.join(REPO, f'data/tilesets/{name}_colors.asm'), 'w').write('\n'.join(col) + '\n')
+    write_text(os.path.join(REPO, f'data/tilesets/{name}_colors.asm'), '\n'.join(col) + '\n')
 
 
 def tile_image(px, scale=1):

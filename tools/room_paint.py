@@ -26,6 +26,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import room_tiles as R  # noqa: E402
+from crystal_tiles import read_text, write_text  # noqa: E402
 
 GRAYS = (255, 170, 85, 0)
 ART = os.path.join(R.REPO, 'art/rooms')
@@ -46,10 +47,10 @@ def picked(name, crystal_root=None):
         for b in range(len(g1.blocks)):
             pick = picks.get(b) or [('gen1', b, q) for q in range(4)]
             out.append([[''.join(map(str, px)), color] for ref in pick for px, color in src.square(ref)])
-        open(path, 'w').write(json.dumps(out, separators=(',', ':')) + '\n')
+        write_text(path, json.dumps(out, separators=(',', ':')) + '\n')
     if not os.path.exists(path):
         raise SystemExit(f'{path} missing: make it with pokecrystal (tools/room_paint.py picked {name} <pokecrystal>)')
-    return [[(tuple(int(c) for c in px), color) for px, color in block] for block in json.load(open(path))]
+    return [[(tuple(int(c) for c in px), color) for px, color in block] for block in json.loads(read_text(path))]
 
 
 def square_image(squares):
@@ -112,7 +113,7 @@ def export(name, crystal_root=None):
               'red wall, blue counter, green warp or door, yellow shelf, unmarked floor.', '']
     for stem, names in written:
         readme.append(f'- {stem}.png: ' + ', '.join(n.lower() for n in names))
-    open(os.path.join(out, 'README.md'), 'w').write('\n'.join(readme) + '\n')
+    write_text(os.path.join(out, 'README.md'), '\n'.join(readme) + '\n')
     print('\n'.join(os.path.join(out, f'{s}.png') for s, _ in written))
 
 
