@@ -177,7 +177,7 @@ Every option starts as the original game played; everything extra is off by defa
 
 #### Graphics
 - SPRITES option: GEN 1 (default) or GEN 2 (Pokémon Crystal fronts and backs, from pret's pokecrystal).
-- Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles (and its flowers), in four shades, so they look the same on a Game Boy as before, only redrawn; with MORE COLOR on a Game Boy Color they take Gold/Silver's look. Every tile keeps its number, so nothing plays differently. Buildings' insides, gyms and caves take Crystal's furniture, floors and walls where a 16x16 piece of a block matches one of Crystal's Kanto rooms closely enough (doors, stairs, ladders and holes keep their look); Pokémon Tower and Indigo Plateau keep their tiles.
+- Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles (and its flowers), in four shades, so they look the same on a Game Boy as before, only redrawn; with MORE COLOR on a Game Boy Color they take Gold/Silver's look. Every tile keeps its number, so nothing plays differently. Pokémon Centers and marts are rebuilt from Crystal's own rooms (its healing machine, counter, floor, shelves and fridges), square by square, playing exactly as before. Other buildings' insides, gyms and caves take Crystal's furniture, floors and walls where a 16x16 piece of a block matches one of Crystal's Kanto rooms closely enough (doors, stairs, ladders and holes keep their look); Pokémon Tower and Indigo Plateau keep their tiles.
 - Party icons: a two-frame icon per species from "MINIDEX 001-251" (Chamber, Solo993, Blue Emerald, Lake, Neslug, Pikachu25).
 - Rocking two-frame egg icon.
 - Gen 2 sprites keep Gen 1 palettes on Game Boy Color.
@@ -464,7 +464,7 @@ Every option starts as the original game played; everything extra is off by defa
 
 ## Credits
 
-**pret** — the [pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow) and [pokecrystal](https://github.com/pret/pokecrystal) disassemblies and their documentation, without which none of this exists. Shin was branched from pret/pokered at [merge pull request #185 (Jul 2, 2018)](https://github.com/pret/pokered/tree/c8599831992c91e521cf1d467ccae3d9498e42ef). Pokémon Crystal's sprites (SPRITES: GEN 2) and Kanto's map tiles come from pret's pokecrystal.
+**pret** — the [pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow) and [pokecrystal](https://github.com/pret/pokecrystal) disassemblies and their documentation, without which none of this exists. Shin was branched from pret/pokered at [merge pull request #185 (Jul 2, 2018)](https://github.com/pret/pokered/tree/c8599831992c91e521cf1d467ccae3d9498e42ef). Pokémon Crystal's sprites (SPRITES: GEN 2) and Kanto's map tiles come from pret's pokecrystal, and candidate room tiles from pret's [pokefirered](https://github.com/pret/pokefirered).
 
 **Shin Pokémon** — [jojobear13](https://github.com/jojobear13/shinpokered) and the Shin team, whose engine fixes, AI, options and features this fork is built on. Shin's credits:
 - Jojobear13's wife, for copywriting and voicework

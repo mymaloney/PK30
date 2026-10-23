@@ -50,7 +50,7 @@ ForestDoorTileIDs:
 	db $3a,$00
 
 MartDoorTileIDs:
-	db $5e,$00
+	db POKECENTER_DOORS,$00
 
 HouseDoorTileIDs:
 	db $54,$00

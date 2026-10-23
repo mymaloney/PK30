@@ -16,7 +16,8 @@ remastered Kanto's outdoors keeping Gen 1's tile numbers. Indoors Crystal
 redesigned the rooms, so no tile-for-tile match holds up; there each 16x16
 piece of a block is matched whole to Crystal's Kanto rooms (choose_quads),
 approximate on purpose, with doors, stairs, ladders, holes and animated
-tiles kept. The cemetery and the plateau are left as they are. The choices
+tiles kept. The cemetery and the plateau are left as they are; tilesets
+tools/room_tiles.py rebuilds whole (room_tiles.ROOMS) are skipped. The choices
 are written to tools/crystal_tiles_choices.txt. `apply` must start from the
 Gen 1 tilesets (it reads the tilesets in gfx/).
 
@@ -500,8 +501,10 @@ def main(root, what):
     print('offsets', {k: o for k, o in offs.items() if o != (0, 0)})
     if what == 'apply':
         chosen = {k: c for k, c in choose(g1, cr, v).items() if k[0] in OUTDOORS}
+        from room_tiles import ROOMS  # tilesets rebuilt whole by tools/room_tiles.py
         for gset in KANTO_SOURCES:  # indoors: piece by piece (choose_quads)
-            chosen.update(choose_quads(g1, cr, gset))
+            if gset not in ROOMS:
+                chosen.update(choose_quads(g1, cr, gset))
         apply(g1, cr, chosen)
     if what == 'votes':
         for (gset, t), c in sorted(v.items()):

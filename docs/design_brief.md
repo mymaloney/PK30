@@ -2378,3 +2378,42 @@ matches, made by
   Viridian Forest, the flowers animating. Indoors: 38 rooms, caves and gyms entered
   in DMG and GBC modes and captured at their doors, all 8 builds built,
   the test suite passing.
+
+## Rooms rebuilt from Crystal's and FireRed's tiles (pilot: Pokémon Centers and marts)
+
+The piece-by-piece redraw of the interiors (above) was judged poor: Crystal
+redesigned Kanto's rooms rather than redrawing them, so Gen 1's tiles have
+no faithful counterparts. The rooms are now rebuilt instead, one tileset at
+a time, by `tools/room_tiles.py`, starting with the Pokémon Center and mart
+tileset (MART and POKECENTER share it).
+
+- **Squares, not tiles.** Every 16x16 square of every Gen 1 block takes a
+  square from Crystal's tilesets (pret/pokecrystal), FireRed/LeafGreen's
+  (pret/pokefirered, flattened and brought to four shades by brightness
+  within the room, `tools/frlg_tiles.py`), or Gen 1's own. Gen 1 often
+  draws an object half a block lower than Crystal, so a block can mix
+  squares from different blocks. The picks are a text file,
+  `tools/room_tiles/pokecenter.txt`, one line per block.
+- **Nothing plays differently.** Maps name blocks and every block keeps its
+  number, so the maps don't change. Gen 1 checks a square by its
+  bottom-left tile; each new bottom-left tile takes the old one's role:
+  walkable (`.tilecoll`), counter (tileset header), warp, door, shelf
+  (BookshelfTileIDs). A picture needed in two roles goes in twice. One
+  liberty: a picture used both as a counter and as a plain wall is a counter
+  everywhere (talking over a back wall finds no one), which keeps the
+  counters within the header's three. The tables are generated
+  (`constants/rooms/pokecenter.asm`, `data/tilesets/pokecenter_colors.asm`
+  for MORE COLOR: Crystal's palette maps, FireRed's hues, Gen 1's own) and
+  `tests/test_room_tiles.py` checks every square of every map against Gen 1.
+- **The limit.** A Gen 1 tileset holds $60 tiles; the pilot uses 95.
+- **Choosing by eye.** `tools/room_picker.py` makes a page with every map of
+  the tileset, the candidates for any square (cycled with the arrow keys,
+  or Crystal's whole blocks with shift), the tile and counter budgets kept
+  as the converter counts them, and the picks file to copy back.
+- **First picks (by me, for review).** Crystal's Pokémon Center: its healing
+  machine and monitor, long counter, lattice floor, doormats, cushioned
+  bench, the Cable Club's door, a PC beside the trade counter; Crystal's
+  mart: shelves, fridges, displays, the till; Crystal's house: the potted
+  plants (one plant twice, for the tile budget). The poster on the back
+  wall was dropped for the budget.
+

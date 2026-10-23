@@ -1,0 +1,300 @@
+<title>PK30 Room Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky bar with the tile budget; maps on the left, the block and its candidates on the right */
+:root{
+  --bg:#eceee6; --panel:#f8f9f4; --fg:#1d241a; --muted:#5b6656; --line:#c9cfc0;
+  --accent:#2f6b3a; --accent-fg:#f4f8f1; --sel:#d4492b; --warn:#b3261e; --ok:#2f6b3a;
+  --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13170f; --panel:#1b2117; --fg:#dde5d4; --muted:#95a18b; --line:#34402d;
+  --accent:#8fbf5a; --accent-fg:#13170f; --sel:#ff7a52; --warn:#ff8a80; --ok:#8fbf5a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13170f; --panel:#1b2117; --fg:#dde5d4; --muted:#95a18b; --line:#34402d;
+  --accent:#8fbf5a; --accent-fg:#13170f; --sel:#ff7a52; --warn:#ff8a80; --ok:#8fbf5a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1{font-size:1.1rem;margin:0;font-weight:600}
+h2{font-size:.95rem;margin:0;font-weight:600}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding-block:10px}
+.meter{display:flex;align-items:center;gap:8px;font:500 .85rem var(--mono);font-variant-numeric:tabular-nums}
+.meter .track{width:120px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter .fill{height:100%;background:var(--ok)}
+.meter.over .fill{background:var(--warn)} .meter.over{color:var(--warn)}
+button,select{font:500 .8rem var(--mono);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 9px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+button:focus-visible,select:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.spacer{flex:1}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:20px;padding-top:14px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.maps{display:flex;flex-wrap:wrap;gap:16px;min-width:0}
+.maps figure{margin:0;min-width:0;max-width:100%}
+.maps figcaption{font:.75rem var(--mono);color:var(--muted);margin-bottom:3px;max-width:60ch}
+.mapwrap{overflow-x:auto;max-width:100%}
+canvas{image-rendering:pixelated;display:block}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;display:grid;gap:12px;position:sticky;top:64px;min-width:0}
+.blockhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.note{color:var(--muted);font-size:.85rem}
+.quads{display:grid;grid-template-columns:repeat(2,64px);gap:3px}
+.quads canvas{width:64px;height:64px;cursor:pointer;border:2px solid transparent}
+.quads canvas.on{border-color:var(--sel)}
+.blockrow{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.legend{font:.75rem var(--mono);color:var(--muted);display:grid;gap:2px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ref{font:.8rem var(--mono);overflow-wrap:anywhere}
+.lab{font:.72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chips button{padding:3px 7px;font-size:.72rem}
+.cands{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.cands canvas{cursor:pointer}
+textarea{width:100%;min-height:160px;font:.75rem var(--mono);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px;box-sizing:border-box}
+.keys{font:.75rem var(--mono);color:var(--muted)}
+.problems{color:var(--warn);font:.8rem var(--mono)}
+</style>
+
+<div class="bar">
+  <h1 id="title">Room picker</h1>
+  <div class="meter" id="tilesMeter"><div class="track"><div class="fill" id="tilesFill"></div></div><span id="tilesText"></span></div>
+  <div class="meter" id="ctrMeter"><span id="ctrText"></span></div>
+  <span class="spacer"></span>
+  <button type="button" id="gen1Toggle" aria-pressed="false">Show Gen 1</button>
+  <button type="button" id="undo">Undo</button>
+  <button type="button" id="reset">Reset to file</button>
+  <button type="button" class="primary" id="copyTop">Copy picks</button>
+</div>
+
+<div class="main">
+  <div class="maps" id="maps"></div>
+  <aside class="panel" aria-label="Selected block">
+    <div class="blockhead"><h2 id="blockTitle">Block</h2><span class="note" id="blockNote"></span></div>
+    <div class="blockrow">
+      <div><div class="lab">Gen 1</div><canvas id="origBlock" width="32" height="32" style="width:64px;height:64px"></canvas></div>
+      <div><div class="lab">Picked (click a square)</div><div class="quads" id="quads"></div></div>
+      <div class="legend" id="roles"></div>
+    </div>
+    <div class="row"><span class="lab">Whole block</span>
+      <button type="button" id="wholePrev" aria-label="Previous Crystal block">◀</button>
+      <button type="button" id="wholeNext" aria-label="Next Crystal block">▶</button>
+      <button type="button" id="wholeGen1">Gen 1's</button>
+      <span class="ref" id="wholeName"></span></div>
+    <div class="row"><span class="lab">Square</span>
+      <button type="button" id="candPrev" aria-label="Previous candidate">◀</button>
+      <button type="button" id="candNext" aria-label="Next candidate">▶</button>
+      <span class="ref" id="sqRef"></span></div>
+    <div class="row">
+      <span class="lab">From</span><div class="chips" id="chips"></div>
+    </div>
+    <div class="row"><span class="lab">Order</span>
+      <select id="order"><option value="alike">Most like Gen 1's square</option><option value="file">As in the tilesets</option></select>
+      <span class="keys" id="candCount"></span></div>
+    <div class="cands" id="candsWrap"><canvas id="cands"></canvas></div>
+    <p class="keys">← → cycle this square · shift+← → whole Crystal blocks · 1–4 pick a square · click the maps to pick a block</p>
+    <div class="problems" id="problems"></div>
+    <div class="row"><span class="lab">Picks file</span><span class="spacer"></span><button type="button" id="copy">Copy</button></div>
+    <textarea id="out" readonly aria-label="Picks file"></textarea>
+  </aside>
+</div>
+
+<script>
+const D = /*DATA*/null;
+const SHADE = [[255,255,255],[170,170,170],[85,85,85],[0,0,0]];
+const KEY = 'room-picker-' + D.room;
+const tileShades = D.atlas.map(s => Uint8Array.from(s, c => +c));
+const sqCache = new Map();
+function squareCanvas(i){
+  if (sqCache.has(i)) return sqCache.get(i);
+  const c = document.createElement('canvas'); c.width = 16; c.height = 16;
+  const ctx = c.getContext('2d'); const img = ctx.createImageData(16,16);
+  D.squares[i].t.forEach((t,k) => {
+    const px = tileShades[t], ox = (k%2)*8, oy = (k>>1)*8;
+    for (let p=0;p<64;p++){ const [r,g,b] = SHADE[px[p]]; const o = ((oy+(p>>3))*16 + ox+(p&7))*4;
+      img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255; }
+  });
+  ctx.putImageData(img,0,0); sqCache.set(i,c); return c;
+}
+let picks = D.blocks.map(b => b.pick.slice());
+try { const saved = JSON.parse(localStorage.getItem(KEY)||'null');
+  if (saved && saved.length === picks.length && saved.every(p => p.length===4 && p.every(i => i < D.squares.length))) picks = saved; } catch(e){}
+const history = [];
+let sel = {b: 0, q: 0}, showGen1 = false, scale = 2;
+let groupsOn = new Set(D.groups.map((_,i)=>i));
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(picks)); } catch(e){} };
+function change(fn){ history.push(picks.map(p=>p.slice())); if (history.length>200) history.shift(); fn(); save(); render(); }
+
+// the tile budget, as tools/room_tiles.py counts it
+const PLAIN = '0,0,0,0,';
+function budget(){
+  const counterPx = new Set();
+  D.blocks.forEach((bl,b) => picks[b].forEach((s,q) => { if (bl.roles[q].split(',')[1]==='1') counterPx.add(D.squares[s].t[2]); }));
+  const keys = new Set(), atl = new Set(), ctr = new Set();
+  D.blocks.forEach((bl,b) => picks[b].forEach((s,q) => {
+    const t = D.squares[s].t[2]; let r = bl.roles[q];
+    if (r===PLAIN && counterPx.has(t)) r = '0,1,0,0,';
+    keys.add(t+'|'+r); atl.add(t); if (r.split(',')[1]==='1') ctr.add(t+'|'+r);
+  }));
+  D.blocks.forEach((bl,b) => picks[b].forEach(s => D.squares[s].t.forEach((t,k) => { if (k!==2 && !atl.has(t)){ atl.add(t); keys.add(t+'|'); } })));
+  return {tiles: keys.size, counters: ctr.size};
+}
+
+function refFor(s, q, b){
+  if (b !== undefined && s === D.blocks[b].pick[q]) return D.blocks[b].names[q];
+  const r = D.squares[s].ref, m = r.match(/^(?!frlg)([\w]+):([0-9A-F]{2})\.([0-3])$/);
+  return m && +m[3]===q ? m[1]+':'+m[2] : r;
+}
+function pickText(b){
+  if (picks[b].every((s,q) => s === D.blocks[b].pick[q])) {
+    const n = D.blocks[b].names, m = n[0].match(/^(?!frlg)([\w]+):([0-9A-F]{2})$/);
+    if (m && n.every(x => x === n[0])) return n[0];
+    return n.join(' ');
+  }
+  const refs = picks[b].map((s,q) => D.squares[s].ref);
+  const ms = refs.map(r => r.match(/^(?!frlg)([\w]+):([0-9A-F]{2})\.([0-3])$/));
+  if (ms.every((m,q) => m && +m[3]===q && m[1]===ms[0][1] && m[2]===ms[0][2])) return ms[0][1]+':'+ms[0][2];
+  return picks[b].map((s,q) => refFor(s,q,b)).join(' ');
+}
+function picksFile(){
+  const lines = ['# '+D.room+': Gen 1 block <- its four squares (see tools/room_tiles.py)'];
+  D.blocks.forEach((bl,b) => { const t = pickText(b); lines.push((b.toString(16).toUpperCase().padStart(2,'0')+' <- '+t.padEnd(52)+' '+(bl.note||'')).trimEnd()); });
+  return lines.join('\n')+'\n';
+}
+
+// maps
+const mapsEl = document.getElementById('maps'), mapCanvases = [];
+D.maps.forEach((mp, mi) => {
+  const fig = document.createElement('figure');
+  const cap = document.createElement('figcaption'); cap.textContent = mp.names.map(n=>n.replace(/_/g,' ').toLowerCase()).join(', ');
+  const wrap = document.createElement('div'); wrap.className = 'mapwrap';
+  const c = document.createElement('canvas'); c.width = mp.w*32; c.height = mp.h*32;
+  c.style.width = (mp.w*32*scale)+'px'; c.style.height = (mp.h*32*scale)+'px'; c.tabIndex = 0;
+  c.addEventListener('click', e => {
+    const r = c.getBoundingClientRect(), x = (e.clientX-r.left)/r.width*mp.w*32, y = (e.clientY-r.top)/r.height*mp.h*32;
+    const bx = Math.floor(x/32), by = Math.floor(y/32);
+    sel = {b: mp.blk[by*mp.w+bx], q: (x%32>=16?1:0)+(y%32>=16?2:0)}; render();
+  });
+  wrap.appendChild(c); fig.append(cap, wrap); mapsEl.appendChild(fig); mapCanvases.push(c);
+});
+function drawMaps(){
+  D.maps.forEach((mp, mi) => {
+    const ctx = mapCanvases[mi].getContext('2d'); ctx.imageSmoothingEnabled = false;
+    for (let y=0;y<mp.h;y++) for (let x=0;x<mp.w;x++){
+      const b = mp.blk[y*mp.w+x], sq = showGen1 ? D.blocks[b].orig : picks[b];
+      sq.forEach((s,q) => ctx.drawImage(squareCanvas(s), x*32+(q%2)*16, y*32+(q>>1)*16));
+      if (b===sel.b){ ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--sel'); ctx.lineWidth = 1;
+        ctx.strokeRect(x*32+.5, y*32+.5, 31, 31); ctx.lineWidth = 2;
+        ctx.strokeRect(x*32+(sel.q%2)*16+1, y*32+(sel.q>>1)*16+1, 14, 14); }
+    }
+  });
+}
+
+// the selected block
+const quadsEl = document.getElementById('quads'), quadCanvases = [];
+for (let q=0;q<4;q++){ const c = document.createElement('canvas'); c.width=16; c.height=16; c.tabIndex=0;
+  c.addEventListener('click', () => { sel.q = q; render(); }); quadsEl.appendChild(c); quadCanvases.push(c); }
+const ROLE_LABEL = r => { const [w,c,wa,d,s] = r.split(','); return [w==='1'?'walk':'wall', c==='1'?'counter':'', wa==='1'?'warp':'', d==='1'?'door':'', s?'shelf':''].filter(Boolean).join(' · '); };
+function drawBlock(){
+  const b = sel.b, bl = D.blocks[b];
+  document.getElementById('blockTitle').textContent = 'Block '+b.toString(16).toUpperCase().padStart(2,'0');
+  document.getElementById('blockNote').textContent = bl.note || '';
+  const o = document.getElementById('origBlock').getContext('2d');
+  bl.orig.forEach((s,q) => o.drawImage(squareCanvas(s), (q%2)*16, (q>>1)*16));
+  picks[b].forEach((s,q) => { const ctx = quadCanvases[q].getContext('2d'); ctx.drawImage(squareCanvas(s),0,0);
+    quadCanvases[q].classList.toggle('on', q===sel.q); });
+  document.getElementById('roles').innerHTML = bl.roles.map((r,q) => `<span>${['top left','top right','bottom left','bottom right'][q]}: ${ROLE_LABEL(r)}</span>`).join('');
+  document.getElementById('sqRef').textContent = D.squares[picks[b][sel.q]].ref + ' · ' + D.groups[D.squares[picks[b][sel.q]].g];
+  const w = D.whole.findIndex(h => h.sq.every((s,q) => s===picks[b][q]));
+  document.getElementById('wholeName').textContent = w>=0 ? D.whole[w].name : '';
+}
+
+// candidates
+const chipsEl = document.getElementById('chips');
+D.groups.forEach((g,i) => { const bt = document.createElement('button'); bt.type='button'; bt.textContent = g; bt.setAttribute('aria-pressed','true');
+  bt.addEventListener('click', () => { if (groupsOn.has(i)) groupsOn.delete(i); else groupsOn.add(i); bt.setAttribute('aria-pressed', groupsOn.has(i)); render(); });
+  chipsEl.appendChild(bt); });
+function distance(a, b){ let d = 0; for (let k=0;k<4;k++){ const x = tileShades[D.squares[a].t[k]], y = tileShades[D.squares[b].t[k]]; for (let p=0;p<64;p++) d += Math.abs(x[p]-y[p]); } return d; }
+let candList = [];
+function candidates(){
+  const orig = D.blocks[sel.b].orig[sel.q];
+  let list = D.squares.map((s,i)=>i).filter(i => groupsOn.has(D.squares[i].g));
+  if (document.getElementById('order').value === 'alike') list.sort((a,b) => distance(a,orig)-distance(b,orig));
+  return list;
+}
+const candCanvas = document.getElementById('cands'), CS = 32, GAP = 2;
+function drawCands(){
+  candList = candidates();
+  const wrapW = document.getElementById('candsWrap').clientWidth || 380;
+  const cols = Math.max(4, Math.floor((wrapW-4)/(CS+GAP)));
+  candCanvas.width = cols*(CS+GAP); candCanvas.height = Math.ceil(candList.length/cols)*(CS+GAP);
+  const ctx = candCanvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  const cur = picks[sel.b][sel.q], selColor = getComputedStyle(document.body).getPropertyValue('--sel');
+  candList.forEach((s,i) => { const x = (i%cols)*(CS+GAP), y = Math.floor(i/cols)*(CS+GAP);
+    ctx.drawImage(squareCanvas(s), x, y, CS, CS);
+    if (s===cur){ ctx.strokeStyle = selColor; ctx.lineWidth = 2; ctx.strokeRect(x+1,y+1,CS-2,CS-2); } });
+  candCanvas.dataset.cols = cols;
+  document.getElementById('candCount').textContent = candList.length + ' squares';
+}
+candCanvas.addEventListener('click', e => {
+  const r = candCanvas.getBoundingClientRect(), cols = +candCanvas.dataset.cols;
+  const i = Math.floor((e.clientY-r.top)/(CS+GAP))*cols + Math.floor((e.clientX-r.left)/(CS+GAP));
+  if (i < candList.length) change(() => { picks[sel.b][sel.q] = candList[i]; });
+});
+function cycle(step){
+  const list = candList.length ? candList : candidates(); if (!list.length) return;
+  const i = list.indexOf(picks[sel.b][sel.q]);
+  change(() => { picks[sel.b][sel.q] = list[((i<0?-1:i)+step+list.length)%list.length]; });
+}
+function cycleWhole(step){
+  const i = D.whole.findIndex(h => h.sq.every((s,q) => s===picks[sel.b][q]));
+  const n = D.whole[((i<0?-1:i)+step+D.whole.length)%D.whole.length];
+  change(() => { picks[sel.b] = n.sq.slice(); });
+}
+
+function render(){
+  drawMaps(); drawBlock(); drawCands();
+  const {tiles, counters} = budget();
+  document.getElementById('tilesFill').style.width = Math.min(100, tiles/96*100)+'%';
+  document.getElementById('tilesText').textContent = tiles+' / 96 tiles';
+  document.getElementById('tilesMeter').classList.toggle('over', tiles>96);
+  document.getElementById('ctrText').textContent = counters+' / 3 counter tiles';
+  document.getElementById('ctrMeter').classList.toggle('over', counters>3);
+  const probs = [];
+  if (tiles>96) probs.push(`Over by ${tiles-96} tiles: reuse squares, or pick ones that share tiles.`);
+  if (counters>3) probs.push(`${counters} different counter tiles; the game holds 3. Use the same counter square in more places.`);
+  document.getElementById('problems').textContent = probs.join(' ');
+  document.getElementById('out').value = picksFile();
+}
+
+document.getElementById('candPrev').onclick = () => cycle(-1);
+document.getElementById('candNext').onclick = () => cycle(1);
+document.getElementById('wholePrev').onclick = () => cycleWhole(-1);
+document.getElementById('wholeNext').onclick = () => cycleWhole(1);
+document.getElementById('wholeGen1').onclick = () => change(() => { picks[sel.b] = D.blocks[sel.b].orig.slice(); });
+document.getElementById('order').onchange = render;
+document.getElementById('undo').onclick = () => { if (history.length){ picks = history.pop(); save(); render(); } };
+document.getElementById('reset').onclick = () => change(() => { picks = D.blocks.map(b => b.pick.slice()); });
+const g1t = document.getElementById('gen1Toggle');
+g1t.onclick = () => { showGen1 = !showGen1; g1t.setAttribute('aria-pressed', showGen1); render(); };
+async function copy(btn){
+  const ta = document.getElementById('out'); const text = picksFile();
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
+  catch(e){ ta.focus(); ta.select(); btn.textContent = 'Selected: press copy'; }
+  setTimeout(() => btn.textContent = btn.id==='copy' ? 'Copy' : 'Copy picks', 1600);
+}
+document.getElementById('copy').onclick = e => copy(e.currentTarget);
+document.getElementById('copyTop').onclick = e => copy(e.currentTarget);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName==='TEXTAREA' || e.target.tagName==='SELECT') return;
+  if (e.key==='ArrowRight'){ e.preventDefault(); e.shiftKey ? cycleWhole(1) : cycle(1); }
+  else if (e.key==='ArrowLeft'){ e.preventDefault(); e.shiftKey ? cycleWhole(-1) : cycle(-1); }
+  else if ('1234'.includes(e.key) && e.key.length===1){ sel.q = +e.key-1; render(); }
+  else if ((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); document.getElementById('undo').click(); }
+});
+document.getElementById('title').textContent = 'Room picker · ' + D.room;
+window.addEventListener('resize', () => drawCands());
+render();
+</script>
