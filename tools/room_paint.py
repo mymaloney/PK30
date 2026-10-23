@@ -221,6 +221,100 @@ def build(crystal_root, name):
             open(path, 'wb').write(data)
 
 
+def tile_count(crystal_root, name):
+    g1 = R.Gen1Room(name)
+    src = R.Sources(g1, crystal_root)
+    picks, notes = R.read_picks(name)
+    for b in range(len(g1.blocks)):
+        picks.setdefault(b, [('gen1', b, q) for q in range(4)])
+    uses, new_maps, split = painted_blocks(g1, src, picks, name)
+    built, problems = R.assemble(uses)
+    return len({px for row in uses for px, c, r in row}), problems
+
+
+def optimize(crystal_root, name, limit=14):
+    """Bring a room tileset's paintings within its tiles: the two most alike
+    tiles (the fewest pixels apart, never more than limit) become one, the
+    one used less taking the other's picture, until it fits. The paintings
+    are saved as merged; the painter's own are kept in painted/, and
+    changes.png marks every pixel that changed (red), at 4x."""
+    lays = layouts(name)
+    arts, pics = {}, collections.Counter()
+    for names, paths, w, h, blk in lays:
+        stem = names[0].lower()
+        mine = os.path.join(ART, name, 'painted', f'{stem}.png')
+        path = mine if os.path.exists(mine) else os.path.join(ART, name, f'{stem}.png')
+        im = read_painting(path, w, h)
+        arts[stem] = (im, w, h)
+        px = im.load()
+        for ty in range(h * 4):
+            for tx in range(w * 4):
+                pics[tuple(px[tx * 8 + i, ty * 8 + j] for j in range(8) for i in range(8))] += 1
+
+    def apart(a, b):
+        return sum(x != y for x, y in zip(a, b))
+    into = {}  # picture -> the picture it now is
+
+    def now(t):
+        while t in into:
+            t = into[t]
+        return t
+
+    def save():
+        os.makedirs(os.path.join(ART, name, 'painted'), exist_ok=True)
+        marks = []
+        for stem, (im, w, h) in arts.items():
+            mine = os.path.join(ART, name, 'painted', f'{stem}.png')
+            if not os.path.exists(mine):
+                im.point(lambda v: GRAYS[min(v, 3)]).save(mine)
+            out = im.copy()
+            px, op = im.load(), out.load()
+            for ty in range(h * 4):
+                for tx in range(w * 4):
+                    t = now(tuple(px[tx * 8 + i, ty * 8 + j] for j in range(8) for i in range(8)))
+                    for j in range(8):
+                        for i in range(8):
+                            op[tx * 8 + i, ty * 8 + j] = t[j * 8 + i]
+            out.point(lambda v: GRAYS[min(v, 3)]).save(os.path.join(ART, name, f'{stem}.png'))
+            big = out.point(lambda v: GRAYS[min(v, 3)]).convert('RGB').resize((w * 128, h * 128), Image.NEAREST)
+            d = ImageDraw.Draw(big)
+            for y in range(h * 32):
+                for x in range(w * 32):
+                    if px[x, y] != op[x, y]:
+                        d.rectangle([x * 4, y * 4, x * 4 + 3, y * 4 + 3], fill=(230, 30, 30))
+            marks.append(big)
+        sheet = Image.new('RGB', (max(m.width for m in marks), sum(m.height + 8 for m in marks)), (60, 60, 60))
+        y = 0
+        for m in marks:
+            sheet.paste(m, (0, y))
+            y += m.height + 8
+        sheet.save(os.path.join(ART, name, 'changes.png'))
+
+    save()
+    count, problems = tile_count(crystal_root, name)
+    pairs = sorted((apart(a, b), a, b) for i, a in enumerate(pics) for b in list(pics)[i + 1:])
+    merged = []
+    for d, a, b in pairs:
+        if not problems:
+            break
+        if d > limit:
+            break
+        a, b = now(a), now(b)
+        if a == b:
+            continue
+        keep, lose = (a, b) if pics[a] >= pics[b] else (b, a)
+        # every picture that becomes this one stays within limit of it
+        if any(apart(t, keep) > limit for t in list(into) + [lose] if now(t) == lose or t == lose):
+            continue
+        into[lose] = keep
+        pics[keep] += pics[lose]
+        merged.append(d)
+        save()
+        count, problems = tile_count(crystal_root, name)
+    print(f'{name}: {len(merged)} tiles merged (at most {max(merged or [0])} pixels apart), '
+          f'{count} pictures' + (': ' + '; '.join(problems) if problems else ', fits'))
+
+
 if __name__ == '__main__':
     root, what, name = sys.argv[1:4]
     if what == 'export':
@@ -229,3 +323,5 @@ if __name__ == '__main__':
         build(root, name)
     elif what == 'guides':
         guides(name)
+    elif what == 'optimize':
+        optimize(root, name)

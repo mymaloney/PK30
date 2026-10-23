@@ -2444,12 +2444,19 @@ it.
   stands on one side and the other side can be walked to from the doors
   (`counters_talked_over`); the rest are walls. That leaves 2-3 counter
   tiles per tileset where the painting needed 4-5.
-- **Status.** The Pokémon Centers and the hotel are the painting: 40 blocks
-  (3 new), 66 tiles, 2 counter tiles, checked pixel for pixel against the
-  painting and in the emulator. The marts and the lobby still use the
-  earlier draft: as painted they need 119 tiles. The lobby alone holds 117
-  different tiles (a Pokémon Center and a shop in one room), so it needs
-  repainting whichever tileset it uses.
+- **Fitting by merging (`room_paint.py optimize`).** When a tileset's
+  paintings need more than $60 tiles, the two most alike tiles (fewest
+  pixels apart, at most 14) become one, the less used taking the other's
+  picture, until it fits. The painter's own paintings stay in
+  `art/rooms/<tileset>/painted/`; `changes.png` marks every pixel changed.
+- **Status.** Both are the painting, checked pixel for pixel against it and
+  in the emulator (color and DMG; clerks talked to over their counters):
+  the Pokémon Centers and the hotel, 39 blocks (2 new), 66 tiles, 2 counter
+  tiles; the marts and the Indigo Plateau lobby, 41 blocks (4 new), 96
+  tiles, 2 counter tiles, after merging 23 near-identical tiles (at most 13
+  pixels apart: highlight lines on counters and shelves, the doorway's
+  shading). The lobby stays with the marts: its shop corner shares their
+  tiles, and its Pokémon Center half needed the smallest merges.
 - A test fix along the way: the Lucky Egg test left party slot 1 empty
   (species 0), so the "past its evolution level" check read before the
   evolution table and depended on ROM layout; it now uses a level 5
