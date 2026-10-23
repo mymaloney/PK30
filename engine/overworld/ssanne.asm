@@ -54,22 +54,73 @@ GetMoveBoulderDustFunctionPointer:
 	pop hl
 	ret
 
+; (AnimateBoulderDust reaches these with jp hl, in this bank: so the dust has
+; its own copies of the battle animations' AdjustOAMBlockXPos and YPos, which
+; are in bank $1E. Jumping to those from here froze the game on every boulder
+; pushed, after this file left bank $1E.)
 MoveBoulderDustFunctionPointerTable:
 ; facing down
 	db $FF,$00
-	dw AdjustOAMBlockYPos
+	dw DustAdjustOAMBlockYPos
 
 ; facing up
 	db $01,$00
-	dw AdjustOAMBlockYPos
+	dw DustAdjustOAMBlockYPos
 
 ; facing left
 	db $01,$01
-	dw AdjustOAMBlockXPos
+	dw DustAdjustOAMBlockXPos
 
 ; facing right
 	db $FF,$01
-	dw AdjustOAMBlockXPos
+	dw DustAdjustOAMBlockXPos
+
+; de = an OAM block, c = its entries: their X by [wCoordAdjustmentAmount], an
+; entry at 168 or more put off the screen
+DustAdjustOAMBlockXPos:
+	ld l, e
+	ld h, d
+	ld de, 4
+.loop
+	ld a, [wCoordAdjustmentAmount]
+	ld b, a
+	ld a, [hl]
+	add b
+	cp 168
+	jr c, .onScreen
+	dec hl
+	ld a, 160
+	ld [hli], a
+.onScreen
+	ld [hl], a
+	add hl, de
+	dec c
+	jr nz, .loop
+	ret
+
+; the same for Y: an entry at $70 or more goes behind the background, flipped
+DustAdjustOAMBlockYPos:
+	ld l, e
+	ld h, d
+	ld de, 4
+.loop
+	ld a, [wCoordAdjustmentAmount]
+	ld b, a
+	ld a, [hl]
+	add b
+	cp $70
+	jr c, .gotAttribute
+	dec hl ; the previous entry's attribute byte
+	push af
+	ld a, $A0
+	ld [hli], a
+	pop af
+.gotAttribute
+	ld [hl], a
+	add hl, de
+	dec c
+	jr nz, .loop
+	ret
 
 LoadSmokeTileFourTimes:
 	ld hl, vChars1 + $7c0

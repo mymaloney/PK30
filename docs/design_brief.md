@@ -2270,6 +2270,17 @@ Bugs reported in play, and what came of each.
   every item without the PC, couldn't find it.)
 - **Badge boosts are back** (see Gen 9 rules pass, part 4), with CHALLENGE >
   BADGE BOOST to turn them off.
+- **Pushing a boulder with Strength froze the game** (first seen in the
+  Warden's house; every boulder did it). `AnimateBoulderDust` reaches its OAM
+  helpers with `jp hl` through a pointer table, so they must share its bank;
+  when `engine/overworld/ssanne.asm` moved from bank $1E to $35 to make room,
+  the helpers (`AdjustOAMBlockXPos`/`YPos`, in the battle animations) stayed
+  in $1E, and the jump landed in unrelated code in $35. The dust now has its
+  own copies next to it. Tests: `test_boulder_dust.py` (every direction
+  returns; the helpers share its bank) and `test_cross_bank.py`, which scans
+  every plain `call` and `jp` for one into another switchable bank (none; the
+  assembler doesn't check). The `dw` pointer tables into other banks all
+  carry or load their bank.
 
 ### Item descriptions in the bag
 
