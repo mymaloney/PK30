@@ -11,12 +11,14 @@ ledges and the rest behave as before), in Crystal's four shades (the DMG's).
     python3 tools/crystal_tiles.py /tmp/pokecrystal votes   # the matches
     python3 tools/crystal_tiles.py /tmp/pokecrystal apply   # write the tilesets
 
-Only the overworld and the forest's grass are applied (APPLY): Crystal
-remastered Kanto's outdoors keeping Gen 1's tile numbers, but redesigned the
-interiors, caves and gyms, where no tile-for-tile match holds up (tried and
-reviewed: furniture came out half-redrawn, floors lost their texture, a
-cave's ladders vanished). The choices are written to
-tools/crystal_tiles_choices.txt.
+The overworld and the forest are matched tile for tile (choose): Crystal
+remastered Kanto's outdoors keeping Gen 1's tile numbers. Indoors Crystal
+redesigned the rooms, so no tile-for-tile match holds up; there each 16x16
+piece of a block is matched whole to Crystal's Kanto rooms (choose_quads),
+approximate on purpose, with doors, stairs, ladders, holes and animated
+tiles kept. The cemetery and the plateau are left as they are. The choices
+are written to tools/crystal_tiles_choices.txt. `apply` must start from the
+Gen 1 tilesets (it reads the tilesets in gfx/).
 
 The graphics are pret/pokecrystal's (gfx/tilesets).
 """
@@ -122,7 +124,7 @@ class Gen1:
         self.tiles = {}
         for name in set(GEN1_FILES.values()):
             b = open(os.path.join(REPO, f'gfx/blocksets/{name}.bst'), 'rb').read()
-            self.blocksets[name] = [b[i:i + 16] for i in range(0, len(b), 16)]
+            self.blocksets[name] = [b[i:i + 16] for i in range(0, len(b) - 15, 16)]
             self.tiles[name] = gray_tiles(os.path.join(REPO, f'gfx/tilesets/{name}.png'))
 
 
@@ -359,7 +361,7 @@ def choose_blocks(g1, cr, v, gset):
     return out
 
 
-APPLY = ('overworld', 'forest')
+OUTDOORS = ('overworld', 'forest')  # matched tile for tile (choose)
 # the other builds' variants of a tileset: a tile is replaced where it is
 # the same as the main tileset's
 VARIANTS = {'overworld': ['green/overworld', 'overworld_bluejp'], 'forest': ['green/forest']}
@@ -378,7 +380,7 @@ def write_png(tiles, path, width=16):
 
 def apply(g1, cr, chosen):
     lines = []
-    for gset in APPLY:
+    for gset in sorted({k[0] for k in chosen}):
         old = g1.tiles[gset]
         new = new_tiles(g1, cr, chosen, gset)
         write_png(new, os.path.join(REPO, f'gfx/tilesets/{gset}.png'))
@@ -400,6 +402,95 @@ def apply(g1, cr, chosen):
     open(os.path.join(REPO, 'tools/crystal_tiles_choices.txt'), 'w').write('\n'.join(lines) + '\n')
 
 
+# indoors: the Crystal tilesets Crystal's own Kanto rooms of the same kind use
+KANTO_SOURCES = {
+    'reds_house': ['players_house', 'house'], 'house': ['house', 'players_house'],
+    'pokecenter': ['pokecenter', 'mart'], 'lab': ['lab'], 'gate': ['gate'],
+    'gym': ['port', 'game_corner', 'tower', 'lab', 'train_station', 'underground', 'cave'],
+    'lobby': ['mart', 'game_corner'], 'mansion': ['mansion', 'house'], 'interior': ['house', 'facility'],
+    'club': ['gate', 'house'], 'ship': ['lighthouse', 'port'], 'ship_port': ['port'],
+    'underground': ['underground'], 'cavern': ['cave', 'dark_cave'], 'facility': ['facility'],
+}
+# not matched: the cemetery (Pokemon Tower's graves came out as floor; Crystal
+# has no tower) and the plateau (Indigo's front lost its grass and pillars)
+QUAD_GOOD = 0.62  # least mean likeness of a 2x2 piece (furniture, floor) to Crystal's
+QUAD_TILE = 0.45  # least likeness of each of its tiles
+# pieces holding a warp tile (data/warp_tile_ids.asm: doors, stairs, ladders,
+# holes) or an animated one (water $14 in CAVE and OUTDOOR tilesets, the
+# flower $03 in OUTDOOR ones) keep their Gen 1 look
+WARP_TILES = {
+    'reds_house': (0x1A, 0x1C), 'pokecenter': (0x5E,), 'gym': (0x4A,), 'house': (0x54, 0x5C, 0x32),
+    'gate': (0x3B,), 'underground': (0x13,), 'ship': (0x37, 0x39, 0x1E, 0x4A), 'cemetery': (0x1B,),
+    'interior': (0x15, 0x55, 0x04), 'cavern': (0x18, 0x1A, 0x22), 'lobby': (0x1A, 0x1C, 0x38),
+    'mansion': (0x1A, 0x1C, 0x53), 'lab': (0x34,), 'facility': (0x43, 0x58, 0x20),
+}
+ANIMATED = {'gym': (0x03, 0x14), 'ship': (0x14,), 'ship_port': (0x14,), 'cavern': (0x14,),
+            'facility': (0x14,), 'plateau': (0x14,)}
+
+
+def edges(px):
+    """how much drawing a tile has: neighbouring pixels of different shades"""
+    return sum(px[i] != px[i + 1] for i in range(64) if i % 8 < 7) + \
+        sum(px[i] != px[i + 8] for i in range(56))
+
+
+def keeps_detail(old, new):
+    """a patterned floor or wall must not come out flat"""
+    e = edges(old)
+    return e < 8 or edges(new) * 2 >= e
+QUADS = ((0, 1, 4, 5), (2, 3, 6, 7), (8, 9, 12, 13), (10, 11, 14, 15))
+
+
+def choose_quads(g1, cr, gset, sources=None, good=QUAD_GOOD):
+    """Indoors: every 16x16 piece of a Gen 1 block (a piece of furniture, a
+    patch of floor) is matched as a whole to the most alike 16x16 piece of
+    Crystal's Kanto rooms, if alike enough; its four tiles change together.
+    A tile in several pieces takes the replacement with the most support."""
+    blank = (0,) * 64
+    tiles = g1.tiles[gset] + [blank] * (256 - len(g1.tiles[gset]))
+    fixed = set(WARP_TILES.get(gset, ()) + ANIMATED.get(gset, ()))
+    pieces = collections.Counter()
+    for block in g1.blocksets[gset]:
+        for q in QUADS:
+            piece = tuple(block[k] for k in q)
+            if not fixed.intersection(piece):
+                pieces[piece] += 1
+    cands = {}
+    # (and the houses' tilesets, where Crystal keeps its plants, PCs, shelves)
+    for cs in sources or dict.fromkeys(KANTO_SOURCES.get(gset, []) + ['house', 'players_house']):
+        for m in cr.tileset(cs)[0]:
+            for q in QUADS:
+                key = (cs, tuple(m[k] for k in q))
+                if key not in cands:
+                    px = [cr.tile(cs, ct) for ct in key[1]]
+                    if all(px):
+                        cands[key] = px
+    support = collections.defaultdict(collections.Counter)
+    for piece, n in pieces.items():
+        ppx = [tiles[t] for t in piece]
+        if not any(any(p) for p in ppx):
+            continue
+        best = None
+        for key, cpx in cands.items():
+            ls = [likeness(a, b) for a, b in zip(ppx, cpx)]
+            score = sum(ls) / 4
+            if (best is None or score > best[0]) and min(ls) >= QUAD_TILE and \
+                    all(keeps_detail(a, b) for a, b in zip(ppx, cpx)):
+                best = (score, key)
+        if best and best[0] >= good:
+            for t, ct in zip(piece, best[1][1]):
+                support[t][(best[1][0], ct)] += n * best[0]
+    out = {}
+    for t, c in support.items():
+        if t >= len(g1.tiles[gset]):
+            continue
+        (cs, ct), _ = c.most_common(1)[0]
+        l = likeness(tiles[t], cr.tile(cs, ct))
+        if l < 1 and t not in fixed:
+            out[(gset, t)] = (cs, ct, 'piece', l)
+    return out
+
+
 def main(root, what):
     g1, cr = Gen1(), Crystal(root)
     print(len(pairs(g1, cr)), 'map pairs:', ' '.join(f'{a}={b}' for a, b in pairs(g1, cr)))
@@ -408,7 +499,10 @@ def main(root, what):
     v = votes(g1, cr, offs)
     print('offsets', {k: o for k, o in offs.items() if o != (0, 0)})
     if what == 'apply':
-        apply(g1, cr, {k: c for k, c in choose(g1, cr, v).items() if k[0] in APPLY})
+        chosen = {k: c for k, c in choose(g1, cr, v).items() if k[0] in OUTDOORS}
+        for gset in KANTO_SOURCES:  # indoors: piece by piece (choose_quads)
+            chosen.update(choose_quads(g1, cr, gset))
+        apply(g1, cr, chosen)
     if what == 'votes':
         for (gset, t), c in sorted(v.items()):
             total = sum(c.values())

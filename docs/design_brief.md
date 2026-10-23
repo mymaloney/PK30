@@ -2325,10 +2325,12 @@ maps don't use); `docs/learnset_changes.md` (`docs/moveset_changes.md`
 covers it). `docs/shin_readme.md` links Shin's repository for what it
 pointed at here. All builds were made from clean after.
 
-## Crystal's tiles for Kanto's outdoors
+## Crystal's tiles for Kanto
 
 Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles
-(pret/pokecrystal `gfx/tilesets/kanto.png`, its DMG flower frames), made by
+(pret/pokecrystal `gfx/tilesets/kanto.png`, its DMG flower frames), and
+buildings and caves its redrawn furniture, floors and walls where a piece
+matches, made by
 `tools/crystal_tiles.py`; its choices, tile by tile, are in
 `tools/crystal_tiles_choices.txt`.
 
@@ -2344,13 +2346,24 @@ Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles
   ($46/$47/$56/$57), for instance, is Crystal's redrawn sign. The forest's
   tiles that are the same pictures as overworld tiles (its grass, the small
   trees) take the overworld's replacements, so they match.
-- **What stays.** Pokémon Centers, marts, houses, gyms, caves, the tower, the
-  ship, the labs: Crystal redesigned those rooms rather than redrawing Gen 1's
-  tiles, and no tile-for-tile match held up when rendered (tried three ways:
-  by votes, by whole blocks, and by likeness alone): furniture came out
-  half-redrawn, chairs sat in boxes of the old floor, floors lost their
-  texture, and in Mt. Moon the holes and ladders vanished. They keep Gen 1's
-  tiles.
+- **Indoors: piece by piece (second pass, on request: "match in some updated
+  Kanto furniture where it exists, even if it's not a perfect match").** A
+  tile-for-tile match doesn't hold indoors (tried by votes, by whole blocks,
+  and by likeness alone: furniture came out half-redrawn, floors lost their
+  texture). So each 16x16 piece of a Gen 1 block (a plant, a PC, a stretch of
+  counter, a patch of floor) is compared whole with every 16x16 piece of the
+  Crystal tilesets its Kanto rooms of the same kind use (KANTO_SOURCES, plus
+  Crystal's house tilesets, where its plants, PCs and shelves are), and takes
+  the most alike if its mean likeness is at least 0.62 and every tile at least
+  0.45. A tile in several pieces takes the replacement with the most support.
+  Guards, after a first render: a patterned tile can't become a flat one
+  (floors kept turning plain white); pieces holding a warp tile
+  (`data/warp_tile_ids.asm`: doors, stairs, ladders, Mt. Moon's holes) or an
+  animated one (water $14, the gyms' flower $03) keep their Gen 1 look. Not
+  matched at all: the cemetery (Pokémon Tower's graves came out as floor;
+  Crystal has no tower) and the plateau (Indigo's front lost its grass and
+  pillars). The matches are approximate by design and up for review: every
+  map before and after is rendered for that (the review gallery).
 - **Unchanged behaviour.** Tile numbers are untouched, so collision, grass,
   water, ledges, warps, Cut trees and the GBC colors by tile (MORE COLOR) are
   as before. Water still animates by rotating tile $14. The flower is
@@ -2362,4 +2375,6 @@ Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles
   from palettes); they go in as they are, so the game looks the same on a
   Game Boy, redrawn. Checked in the emulator in DMG and GBC modes (MORE COLOR
   off and on): Pallet Town, Cerulean City, Fuchsia City, Route 1 and
-  Viridian Forest, the flowers animating.
+  Viridian Forest, the flowers animating. Indoors: 38 rooms, caves and gyms entered
+  in DMG and GBC modes and captured at their doors, all 8 builds built,
+  the test suite passing.
