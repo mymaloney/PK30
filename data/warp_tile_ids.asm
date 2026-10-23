@@ -37,8 +37,10 @@ RedsHouse2WarpTileIDs:
 	db $1A,$1C,$FF
 
 MartWarpTileIDs:
+	db MART_WARPS ; constants/rooms/mart.asm
+
 PokecenterWarpTileIDs:
-	db POKECENTER_WARPS,$FF
+	db POKECENTER_WARPS ; constants/rooms/pokecenter.asm
 
 ForestWarpTileIDs:
 	db $5A,$5C,$3A,$FF

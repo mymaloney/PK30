@@ -16,30 +16,17 @@ A block used in several places is drawn the same everywhere in the game, so
 a painting can change it in one place and leave the others, and the
 importer will ask which to keep.
 """
+import collections
 import os
 import sys
 
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import crystal_tiles  # noqa: E402
 import room_tiles as R  # noqa: E402
 
 GRAYS = (255, 170, 85, 0)
 ART = os.path.join(R.REPO, 'art/rooms')
-
-
-def room_maps(name):
-    """the room tileset's maps, those with the same blocks merged: [(names, w, h, blocks)]"""
-    maps = crystal_tiles.Gen1()
-    seen = {}
-    for mname, (gset, path) in sorted(maps.maps.items()):
-        if gset != name:
-            continue
-        w, h = maps.dims[mname]
-        key = (w, h, open(path, 'rb').read())
-        seen.setdefault(key, []).append(mname)
-    return [(names, key[0], key[1], key[2]) for key, names in seen.items()]
 
 
 def square_image(squares):
@@ -69,7 +56,7 @@ def guide(g1, im, w, h, blk, scale=4):
     for y in range(h):
         for x in range(w):
             b = blk[y * w + x]
-            for q, (walk, counter, warp, door, shelf) in enumerate(R.square_roles(g1, g1.blocks[b])):
+            for q, (walk, counter, warp, door, shelf) in enumerate(R.square_roles(g1, g1.blocks[b], b)):
                 sx, sy = (x * 2 + q % 2) * S, (y * 2 + q // 2) * S
                 color = ((255, 210, 0, 90) if shelf else (40, 110, 255, 90) if counter else
                          (0, 200, 80, 90) if warp or door else None if walk else (255, 40, 40, 45))
@@ -91,7 +78,7 @@ def export(crystal_root, name):
     out = os.path.join(ART, name)
     os.makedirs(out, exist_ok=True)
     written = []
-    for names, w, h, blk in room_maps(name):
+    for names, paths, w, h, blk in layouts(name):
         stem = names[0].lower()
         im = render(src, picks, w, h, blk)
         im.save(os.path.join(out, f'{stem}.png'))
@@ -107,7 +94,138 @@ def export(crystal_root, name):
     print('\n'.join(os.path.join(out, f'{s}.png') for s, _ in written))
 
 
+def layouts(name):
+    """the room tileset's maps (as Gen 1 had them), those with the same blocks
+    merged: [(names, paths, w, h, blocks)]"""
+    seen = {}
+    for mname, path, w, h in R.room_maps(name):
+        # Gen 1's map, as it was before blocks were painted apart
+        key = (w, h, R.git_show(os.path.relpath(path, R.REPO)))
+        names, paths = seen.setdefault(key, ([], []))
+        names.append(mname)
+        if path not in paths:
+            paths.append(path)
+    return [(names, paths, key[0], key[1], key[2]) for key, (names, paths) in seen.items()]
+
+
+def snap(im):
+    """a painting -> its pixels as shades 0-3 (white to black), nearest gray"""
+    g = im.convert('L')
+    return g.point(lambda v: min(range(4), key=lambda i: abs(GRAYS[i] - v)))
+
+
+def read_painting(path, w, h):
+    im = Image.open(path)
+    if im.size != (w * 32, h * 32):
+        k = im.width // (w * 32)
+        if k < 1 or im.size != (w * 32 * k, h * 32 * k):
+            raise SystemExit(f'{path}: {im.size}, not {w * 32}x{h * 32} or a whole multiple')
+        im = im.resize((w * 32, h * 32), Image.NEAREST)
+    return snap(im)
+
+
+def painted_blocks(g1, src, picks, name):
+    """every block as painted -> (uses for room_tiles.assemble, new map blocks per layout)
+
+    A Gen 1 block painted the same everywhere keeps its number; one painted
+    differently somewhere becomes a new block there (after the Gen 1 ones),
+    with the same roles. Colors (MORE COLOR) come from the squares the picks
+    named."""
+    found = []  # (layout, x, y, gen 1 block, 32x32 shades)
+    lays = layouts(name)
+    for names, paths, w, h, blk in lays:
+        art = os.path.join(ART, name, f'{names[0].lower()}.png')
+        if not os.path.exists(art):
+            raise SystemExit(f'no painting {art}')
+        px = read_painting(art, w, h).load()
+        for y in range(h):
+            for x in range(w):
+                shades = tuple(px[x * 32 + i, y * 32 + j] for j in range(32) for i in range(32))
+                found.append((names[0], x, y, blk[y * w + x], shades))
+    versions = {}
+    for lay, x, y, b, sh in found:
+        versions.setdefault(b, collections.Counter())[sh] += 1
+    ids = {}  # (gen 1 block, shades) -> block number
+    for b, c in versions.items():
+        ids[(b, c.most_common(1)[0][0])] = b
+    extra = len(g1.blocks)
+    for b in sorted(versions):
+        for sh, n in versions[b].most_common()[1:]:
+            ids[(b, sh)] = extra
+            extra += 1
+    source = {i: key for key, i in ids.items()}
+    uses = []
+    filler = None
+    borders = R.border_blocks(name)
+    for i in range(extra):
+        if i not in source and i in borders:  # drawn past the map's edges: as picked, no roles
+            uses.append([None] * 16)
+            for q, ref in enumerate(picks[i]):
+                for k, (px, color) in zip(R.QUADS[q], src.square(ref)):
+                    uses[-1][k] = (px, color, None)
+            continue
+        if i not in source:  # a block no map shows: any pictures, no roles
+            uses.append(None)
+            continue
+        b, sh = source[i]
+        roles = square_roles_of(g1, b)
+        colors = [color for ref in picks[b] for px, color in src.square(ref)]
+        row = [None] * 16
+        for k in range(16):
+            tx, ty = (k % 4) * 8, (k // 4) * 8
+            px = tuple(sh[(ty + j) * 32 + tx + i2] for j in range(8) for i2 in range(8))
+            q = (k // 8) * 2 + (k % 4) // 2  # the square tile k is in
+            color = colors[q * 4 + R.QUADS[q].index(k)]
+            row[k] = (px, color, roles[R.BOTTOM_LEFT.index(k)] if k in R.BOTTOM_LEFT else None)
+        uses.append(row)
+        filler = filler or row
+    uses = [u if u else [(px, c, None) for px, c, r in filler] for u in uses]
+    new_maps = []
+    for names, paths, w, h, blk in lays:
+        cells = {(x, y): ids[(b, sh)] for lay, x, y, b, sh in found if lay == names[0]}
+        new_maps.append((paths, bytes(cells[(x, y)] for y in range(h) for x in range(w))))
+    return uses, new_maps, {b: len(c) for b, c in versions.items() if len(c) > 1}
+
+
+def guides(name):
+    """a guide beside each painting: blocks, numbers, roles (Gen 1's blocks)"""
+    g1 = R.Gen1Room(name)
+    for names, paths, w, h, blk in layouts(name):
+        art = os.path.join(ART, name, f'{names[0].lower()}.png')
+        if os.path.exists(art):
+            im = read_painting(art, w, h).point(lambda v: GRAYS[min(v, 3)])
+            guide(g1, im, w, h, blk).save(art.replace('.png', '_guide.png'))
+
+
+def square_roles_of(g1, b):
+    return R.square_roles(g1, g1.blocks[b], b)
+
+
+def build(crystal_root, name):
+    g1 = R.Gen1Room(name)
+    src = R.Sources(g1, crystal_root)
+    picks, notes = R.read_picks(name)
+    for b in range(len(g1.blocks)):
+        picks.setdefault(b, [('gen1', b, q) for q in range(4)])
+    uses, new_maps, split = painted_blocks(g1, src, picks, name)
+    built, problems = R.assemble(uses)
+    print(f'{name}: {len(uses)} blocks ({sum(split.values()) - len(split)} new, from '
+          f'{", ".join(f"{b:02X}" for b in sorted(split)) or "none"}), {len(built[0])} tiles, '
+          f'{len(built[3])} counter tiles')
+    if problems:
+        raise SystemExit('\n'.join(problems))
+    R.write(name, g1, built)
+    guides(name)
+    for paths, data in new_maps:
+        for path in paths:
+            open(path, 'wb').write(data)
+
+
 if __name__ == '__main__':
     root, what, name = sys.argv[1:4]
     if what == 'export':
         export(root, name)
+    elif what == 'build':
+        build(root, name)
+    elif what == 'guides':
+        guides(name)

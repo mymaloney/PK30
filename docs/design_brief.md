@@ -2420,3 +2420,38 @@ tileset (MART and POKECENTER share it).
   plants (one plant twice, for the tile budget). The poster on the back
   wall was dropped for the budget.
 
+### Painting the rooms over (`tools/room_paint.py`)
+
+Picking squares wasn't enough: the rooms are now painted. `room_paint.py
+export` renders each room layout (as its picks have it) at 1x in the four
+grays, with a 4x guide of blocks and square roles; the painting comes back
+to `art/rooms/<tileset>/` and `room_paint.py build` makes the tileset from
+it.
+
+- **Every block as painted.** A Gen 1 block painted the same everywhere
+  keeps its number; one painted differently in some places (a shadow under
+  a wall, the hotel's own wall, a counter's end) becomes a new block there,
+  with the same roles, and the maps are rewritten to use it. The build
+  always starts from Gen 1's maps (from git), so it can be rerun after any
+  repaint. Border blocks (drawn past a map's edges) keep their picked look.
+- **The Pokémon Center and the mart apart.** Gen 1's MART and POKECENTER
+  tilesets shared one set of graphics; they now have their own
+  (`gfx/tilesets/mart.png`, `pokecenter.png`), each up to $60 tiles. MART's
+  graphics and blocks moved to a section of their own (bank $1A was full;
+  the tileset header names the bank). The marts and the Indigo Plateau
+  lobby use MART; the Pokémon Centers and the Celadon Hotel POKECENTER.
+- **Counters you can talk over.** A counter is only a counter where a person
+  stands on one side and the other side can be walked to from the doors
+  (`counters_talked_over`); the rest are walls. That leaves 2-3 counter
+  tiles per tileset where the painting needed 4-5.
+- **Status.** The Pokémon Centers and the hotel are the painting: 40 blocks
+  (3 new), 66 tiles, 2 counter tiles, checked pixel for pixel against the
+  painting and in the emulator. The marts and the lobby still use the
+  earlier draft: as painted they need 119 tiles. The lobby alone holds 117
+  different tiles (a Pokémon Center and a shop in one room), so it needs
+  repainting whichever tileset it uses.
+- A test fix along the way: the Lucky Egg test left party slot 1 empty
+  (species 0), so the "past its evolution level" check read before the
+  evolution table and depended on ROM layout; it now uses a level 5
+  Bulbasaur.
+

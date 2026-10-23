@@ -255,6 +255,7 @@ db	3,	3,	3,	3,	6,	6,	6,	6,	6,	6,	6,	3,	3,	6,	6,	6;
 ;	50	51	52	53	54	55	56	57	58	59	5A	5B	5C	5D	5E	5F
 db	6,	6,	6,	6,	4,	4,	4,	4,	6,	6,	6,	6,	6,	6,	4,	4;
 PalSettings_MART:        	; 2
+INCLUDE "data/tilesets/mart_colors.asm"
 PalSettings_POKECENTER:  	; 6		- done
 INCLUDE "data/tilesets/pokecenter_colors.asm"
 PalSettings_DOJO:        	; 5

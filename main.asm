@@ -1644,9 +1644,7 @@ Gym_GFX:           INCBIN "gfx/tilesets/gym.2bpp"
 Dojo_Block:
 Gym_Block:         INCBIN "gfx/blocksets/gym.bst"
 
-Mart_GFX:
 Pokecenter_GFX:    INCBIN "gfx/tilesets/pokecenter.2bpp"
-Mart_Block:
 Pokecenter_Block:  INCBIN "gfx/blocksets/pokecenter.bst"
 
 ForestGate_GFX:
@@ -2084,3 +2082,10 @@ ELSE
 INCLUDE "data/rando/intl_run.asm"
 ENDC
 
+
+; the mart's tiles and blocks, apart from the Pokemon Center's since they
+; were rebuilt (tools/room_tiles.py); the tileset header names their bank,
+; so they share one
+SECTION "Mart Tileset", ROMX
+Mart_GFX:          INCBIN "gfx/tilesets/mart.2bpp"
+Mart_Block:        INCBIN "gfx/blocksets/mart.bst"

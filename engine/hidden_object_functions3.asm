@@ -58,8 +58,8 @@ BookshelfTileIDs:
 	db_tx_pre BookOrSculptureText
 	db GATE,         $22
 	db_tx_pre BookOrSculptureText
-	pokecenter_shelves MART ; constants/rooms/pokecenter.asm
-	pokecenter_shelves POKECENTER
+	mart_shelves MART ; constants/rooms/mart.asm
+	pokecenter_shelves POKECENTER ; constants/rooms/pokecenter.asm
 	db LOBBY,        $50
 	db_tx_pre PokemonStuffText
 	db LOBBY,        $52

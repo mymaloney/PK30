@@ -27,6 +27,9 @@ class ExperienceItemTest(unittest.TestCase):
         g.poke("wPlayerID", 0x12, 0x34)
         g.poke("wPartyMon1OTID", 0x12, 0x99 if traded else 0x34)
         g.poke("wPartyMon1CatchRate", ITEMS[item] if item else 0)
+        # a real mon, short of its evolution level (no x1.2)
+        g.poke("wPartyMon1Species", SPECIES["BULBASAUR"])
+        g.poke("wPartyMon1Level", 5)
         g.poke("wPartyMon1Exp", 0, 0, 0)
         g.poke(0xFF95, 0, 0, 0, 100)  # H_QUOTIENT: the experience to give
         g.call("AddExpToPokemon", hl=g.addr("wPartyMon1OTID"))

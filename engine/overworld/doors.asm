@@ -50,7 +50,7 @@ ForestDoorTileIDs:
 	db $3a,$00
 
 MartDoorTileIDs:
-	db POKECENTER_DOORS,$00
+	db MART_DOORS ; constants/rooms/mart.asm
 
 HouseDoorTileIDs:
 	db $54,$00

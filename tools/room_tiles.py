@@ -51,8 +51,10 @@ ORIGINAL = '4ba5456'  # the last commit with Gen 1's indoor tilesets as they wer
 
 # gen 1 graphics tileset -> the tileset constants that use it, and the
 # Crystal tilesets its blocks are proposed from (picks can name any)
+# (gen1: the Gen 1 tileset it began as; MART and POKECENTER shared one)
 ROOMS = {
-    'pokecenter': dict(constants=('MART', 'POKECENTER'), crystal=('pokecenter', 'mart', 'house')),
+    'pokecenter': dict(constants=('POKECENTER',), gen1='pokecenter', crystal=('pokecenter', 'mart', 'house')),
+    'mart': dict(constants=('MART',), gen1='pokecenter', crystal=('mart', 'pokecenter', 'house')),
 }
 
 QUADS = ((0, 1, 4, 5), (2, 3, 6, 7), (8, 9, 12, 13), (10, 11, 14, 15))
@@ -78,13 +80,15 @@ class Gen1Room:
 
     def __init__(self, name):
         self.name = name
+        self.talked_over = None  # counters_talked_over, when first needed
         consts = ROOMS[name]['constants']
+        gen1 = ROOMS[name].get('gen1', name)
         path = f'/tmp/gen1_{os.getpid()}_{name}.png'
-        open(path, 'wb').write(git_show(f'gfx/tilesets/{name}.png'))
+        open(path, 'wb').write(git_show(f'gfx/tilesets/{gen1}.png'))
         self.tiles = gray_tiles(path)
         os.remove(path)
-        self.blocks = blocks_of(git_show(f'gfx/blocksets/{name}.bst'))
-        self.walkable = set(git_show(f'gfx/tilesets/{name}.tilecoll').split(b'\xff')[0])
+        self.blocks = blocks_of(git_show(f'gfx/blocksets/{gen1}.bst'))
+        self.walkable = set(git_show(f'gfx/tilesets/{gen1}.tilecoll').split(b'\xff')[0])
         headers = git_show('data/tileset_headers.asm').decode()
         label = consts[0].title().replace('_', '')
         m = re.search(rf'tileset {label}_Block,.*?,\s*(\$\w+),(\$\w+),(\$\w+),', headers)
@@ -141,8 +145,107 @@ class CrystalSet:
         return MORE_COLOR.get(names[i] if i < len(names) else 'GRAY', 3)
 
 
-def square_roles(g1, block):
-    return [g1.role(block[k]) for k in BOTTOM_LEFT]
+def room_maps(name):
+    """the maps with this room tileset: [(map, .blk path, width, height)]"""
+    main = open(os.path.join(REPO, 'main.asm')).read()
+    blk = dict(re.findall(r'^(\w+Blocks):\s*INCBIN\s+"([^"]+)"', main, re.M))
+    # labels stacked on one INCBIN share it
+    for group in re.findall(r'((?:^\w+Blocks:\s*\n)+)(^\w+Blocks):\s*INCBIN\s+"([^"]+)"', main, re.M):
+        for label in re.findall(r'(\w+Blocks):', group[0]):
+            blk[label] = group[2]
+    consts = open(os.path.join(REPO, 'constants/map_constants.asm')).read()
+    dims = {m.group(1): (int(m.group(3)), int(m.group(2))) for m in
+            re.finditer(r'mapconst (\w+),\s*(\d+),\s*(\d+)', consts)}
+    out = []
+    hdr_dir = os.path.join(REPO, 'data/mapHeaders')
+    for f in sorted(os.listdir(hdr_dir)):
+        t = open(os.path.join(hdr_dir, f)).read()
+        ts = re.search(r'db (\w+) ; tileset', t)
+        dim = re.search(r'db (\w+)_HEIGHT', t)
+        bl = re.search(r'dw (\w+Blocks)', t)
+        if ts and dim and bl and ts.group(1) in ROOMS[name]['constants'] and bl.group(1) in blk:
+            w, h = dims[dim.group(1)]
+            out.append((dim.group(1), os.path.join(REPO, blk[bl.group(1)]), w, h))
+    return out
+
+
+def border_blocks(name):
+    """the blocks drawn past the edges of this room tileset's maps"""
+    objects = {}
+    for f in os.listdir(os.path.join(REPO, 'data/mapObjects')):
+        t = open(os.path.join(REPO, 'data/mapObjects', f)).read()
+        for label, b in re.findall(r'^(\w+Object):\s*\n\s*db \$?(\w+) ; border block', t, re.M):
+            objects[label] = int(b, 16)
+    out = set()
+    hdr_dir = os.path.join(REPO, 'data/mapHeaders')
+    for f in sorted(os.listdir(hdr_dir)):
+        t = open(os.path.join(hdr_dir, f)).read()
+        ts = re.search(r'db (\w+) ; tileset', t)
+        ob = re.search(r'dw (\w+Object) ; objects', t)
+        if ts and ob and ts.group(1) in ROOMS[name]['constants'] and ob.group(1) in objects:
+            out.add(objects[ob.group(1)])
+    return out
+
+
+def map_people(name):
+    """{map: ([(x, y) of each person], [(x, y) of each warp])} for this room tileset's maps"""
+    objects = {}
+    for f in os.listdir(os.path.join(REPO, 'data/mapObjects')):
+        t = open(os.path.join(REPO, 'data/mapObjects', f)).read()
+        for label, body in re.findall(r'^(\w+Object):(.*?)(?=^\w+Object:|\Z)', t, re.M | re.S):
+            objects[label] = ([(int(x), int(y)) for x, y in re.findall(r'^\s*object \w+, (\d+), (\d+)', body, re.M)],
+                              [(int(x), int(y)) for x, y in re.findall(r'^\s*warp (\d+), (\d+)', body, re.M)])
+    out = {}
+    hdr_dir = os.path.join(REPO, 'data/mapHeaders')
+    for f in sorted(os.listdir(hdr_dir)):
+        t = open(os.path.join(hdr_dir, f)).read()
+        ts = re.search(r'db (\w+) ; tileset', t)
+        dim = re.search(r'db (\w+)_HEIGHT', t)
+        ob = re.search(r'dw (\w+Object) ; objects', t)
+        if ts and dim and ob and ts.group(1) in ROOMS[name]['constants']:
+            out[dim.group(1)] = objects.get(ob.group(1), ([], []))
+    return out
+
+
+def counters_talked_over(g1):
+    """(block, square) of Gen 1's counters you can talk over in some map: a
+    person stands on one side and the other is a square you can walk to from
+    the doors. The others are walls"""
+    people = map_people(g1.name)
+    out = set()
+    for mname, path, w, h in room_maps(g1.name):
+        blk = git_show(os.path.relpath(path, REPO))
+        here, warps = (set(v) for v in people.get(mname, ([], [])))
+
+        def square(sx, sy):
+            b = blk[(sy // 2) * w + sx // 2]
+            return b, (sy % 2) * 2 + sx % 2, g1.role(g1.blocks[b][BOTTOM_LEFT[(sy % 2) * 2 + sx % 2]])
+        # the squares you can reach from the doors
+        reach, todo = set(), [p for p in warps if 0 <= p[0] < w * 2 and 0 <= p[1] < h * 2]
+        while todo:
+            sx, sy = todo.pop()
+            if (sx, sy) in reach or not (0 <= sx < w * 2 and 0 <= sy < h * 2) or not square(sx, sy)[2][0]:
+                continue
+            reach.add((sx, sy))
+            todo += [(sx + 1, sy), (sx - 1, sy), (sx, sy + 1), (sx, sy - 1)]
+        for sx in range(w * 2):
+            for sy in range(h * 2):
+                b, q, role = square(sx, sy)
+                if role[1] and any((sx + dx, sy + dy) in here and (sx - dx, sy - dy) in reach
+                                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    out.add((b, q))
+    return out
+
+
+def square_roles(g1, block, b=None):
+    """what each 16x16 square of a Gen 1 block does; with the block's number,
+    a counter no one stands behind is a wall"""
+    roles = [g1.role(block[k]) for k in BOTTOM_LEFT]
+    if b is None:
+        return roles
+    if g1.talked_over is None:
+        g1.talked_over = counters_talked_over(g1)
+    return [r[:1] + (False,) + r[2:] if r[1] and (b, q) not in g1.talked_over else r for q, r in enumerate(roles)]
 
 
 def score(g1, cr, gblock, cs, m):
@@ -271,13 +374,18 @@ def build(g1, src, picks):
     """-> (tiles, blocks, walkable ids, counter ids, warp ids, door ids, {shelf id: text}, colors), problems"""
     uses = []  # per block: 16 (pixels, color, role or None)
     for b, gblock in enumerate(g1.blocks):
-        roles = square_roles(g1, gblock)
+        roles = square_roles(g1, gblock, b)
         row = [None] * 16
         for i, ref in enumerate(picks[b]):
             for k_to, (px, color) in zip(QUADS[i], src.square(ref)):
                 role = roles[BOTTOM_LEFT.index(k_to)] if k_to in BOTTOM_LEFT else None
                 row[k_to] = (px, color, role)
         uses.append(row)
+    return assemble(uses)
+
+
+def assemble(uses):
+    """blocks as 16 (tile pixels, MORE COLOR color, role at a bottom-left or None) -> the tileset"""
     # a counter is a wall you can talk over: a picture used as both a
     # counter and a plain wall is a counter everywhere (talking over a back
     # wall finds no one)
@@ -315,6 +423,8 @@ def build(g1, src, picks):
     shelves = {t: r[4] for t, r in roles_of.items() if r[4]}
     if len(counters) > 3:
         problems.append(f'{len(counters)} counter tiles: a tileset header holds 3')
+    if 0 in doors:
+        problems.append('tile $00 is a door, but $00 ends the door list')
     return (tiles[:0x60], blocks, walk, counters, warps, doors, shelves, colors[:0x60]), problems
 
 
@@ -330,8 +440,8 @@ def write(name, g1, built):
     up = name.upper()
     out = [f'; {name}: made by tools/room_tiles.py; don\'t edit',
            *[f'DEF {up}_COUNTER_{i + 1} EQU ${t:02X}' for i, t in enumerate((counters + [0xFF] * 3)[:3])],
-           f'DEF {up}_WARPS EQUS "{hexes(warps)}"',
-           f'DEF {up}_DOORS EQUS "{hexes(doors)}"',
+           f'DEF {up}_WARPS EQUS "{hexes(warps + [0xFF])}"  ; ends with $FF',
+           f'DEF {up}_DOORS EQUS "{hexes(doors + [0x00])}"  ; ends with $00',
            '; the shelves you read (BookshelfTileIDs), for tileset \\1',
            f'MACRO {name}_shelves']
     for t, text in sorted(shelves.items()):

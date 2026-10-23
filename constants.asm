@@ -34,6 +34,7 @@ INCLUDE "constants/starter_mons.asm"
 INCLUDE "constants/event_constants.asm"
 INCLUDE "constants/text_constants.asm"
 INCLUDE "constants/rooms/pokecenter.asm"
+INCLUDE "constants/rooms/mart.asm"
 IF DEF(_REDGREENJP)
 INCLUDE "data/rando/jp_consts.asm"
 ELSE
