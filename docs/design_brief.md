@@ -2451,9 +2451,9 @@ it.
   `art/rooms/<tileset>/painted/`; `changes.png` marks every pixel changed.
 - **Status.** Both are the painting, checked pixel for pixel against it and
   in the emulator (color and DMG; clerks talked to over their counters):
-  the Pokémon Centers and the hotel, 39 blocks (2 new), 66 tiles, 2 counter
+  the Pokémon Centers and the hotel, 40 blocks (3 new), 64 tiles, 2 counter
   tiles; the marts and the Indigo Plateau lobby, 41 blocks (4 new), 96
-  tiles, 2 counter tiles, after merging 23 near-identical tiles (at most 13
+  tiles, 2 counter tiles, after merging 18 near-identical tiles (at most 10
   pixels apart: highlight lines on counters and shelves, the doorway's
   shading). The lobby stays with the marts: its shop corner shares their
   tiles, and its Pokémon Center half needed the smallest merges.
