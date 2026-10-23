@@ -2379,7 +2379,7 @@ matches, made by
   in DMG and GBC modes and captured at their doors, all 8 builds built,
   the test suite passing.
 
-## Rooms rebuilt from Crystal's and FireRed's tiles (pilot: Pokémon Centers and marts)
+## Rooms rebuilt from Crystal's tiles (pilot: Pokémon Centers and marts)
 
 The piece-by-piece redraw of the interiors (above) was judged poor: Crystal
 redesigned Kanto's rooms rather than redrawing them, so Gen 1's tiles have
@@ -2388,9 +2388,10 @@ a time, by `tools/room_tiles.py`, starting with the Pokémon Center and mart
 tileset (MART and POKECENTER share it).
 
 - **Squares, not tiles.** Every 16x16 square of every Gen 1 block takes a
-  square from Crystal's tilesets (pret/pokecrystal), FireRed/LeafGreen's
-  (pret/pokefirered, flattened and brought to four shades by brightness
-  within the room, `tools/frlg_tiles.py`), or Gen 1's own. Gen 1 often
+  square from any of Crystal's 36 tilesets (pret/pokecrystal; Johto's fill
+  gaps Kanto's rooms leave) or Gen 1's own. FireRed/LeafGreen's tiles were
+  tried as a third source and dropped: brought to four shades they were a
+  complete mismatch. Gen 1 often
   draws an object half a block lower than Crystal, so a block can mix
   squares from different blocks. The picks are a text file,
   `tools/room_tiles/pokecenter.txt`, one line per block.
@@ -2403,7 +2404,8 @@ tileset (MART and POKECENTER share it).
   everywhere (talking over a back wall finds no one), which keeps the
   counters within the header's three. The tables are generated
   (`constants/rooms/pokecenter.asm`, `data/tilesets/pokecenter_colors.asm`
-  for MORE COLOR: Crystal's palette maps, FireRed's hues, Gen 1's own) and
+  for MORE COLOR: Crystal's palette maps, with its indoor red as pink, or
+  Gen 1's own) and
   `tests/test_room_tiles.py` checks every square of every map against Gen 1.
 - **The limit.** A Gen 1 tileset holds $60 tiles; the pilot uses 95.
 - **Choosing by eye.** `tools/room_picker.py` makes a page with every map of

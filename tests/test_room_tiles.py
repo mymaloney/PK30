@@ -1,4 +1,4 @@
-"""Rooms rebuilt from Crystal's and FireRed's tiles (tools/room_tiles.py) play
+"""Rooms rebuilt from Crystal's tiles (tools/room_tiles.py) play
 as Gen 1's did: in every map, every 16x16 square's bottom-left tile (the one
 Gen 1 checks) is walkable, a counter, a warp, a door or a shelf exactly
 where the Gen 1 tile was."""

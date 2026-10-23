@@ -49,8 +49,6 @@ canvas{image-rendering:pixelated;display:block}
 .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .ref{font:.8rem var(--mono);overflow-wrap:anywhere}
 .lab{font:.72rem var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.chips{display:flex;flex-wrap:wrap;gap:4px}
-.chips button{padding:3px 7px;font-size:.72rem}
 .cands{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
 .cands canvas{cursor:pointer}
 textarea{width:100%;min-height:160px;font:.75rem var(--mono);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px;box-sizing:border-box}
@@ -88,13 +86,14 @@ textarea{width:100%;min-height:160px;font:.75rem var(--mono);background:var(--bg
       <button type="button" id="candNext" aria-label="Next candidate">▶</button>
       <span class="ref" id="sqRef"></span></div>
     <div class="row">
-      <span class="lab">From</span><div class="chips" id="chips"></div>
+      <span class="lab">From</span><select id="from" aria-label="Tileset"></select>
     </div>
     <div class="row"><span class="lab">Order</span>
       <select id="order"><option value="alike">Most like Gen 1's square</option><option value="file">As in the tilesets</option></select>
       <span class="keys" id="candCount"></span></div>
+    <div class="row"><button type="button" id="pagePrev">◀ Page</button><span class="keys" id="pageText"></span><button type="button" id="pageNext">Page ▶</button></div>
     <div class="cands" id="candsWrap"><canvas id="cands"></canvas></div>
-    <p class="keys">← → cycle this square · shift+← → whole Crystal blocks · 1–4 pick a square · click the maps to pick a block</p>
+    <p class="keys">← → cycle this square · shift+← → whole Crystal blocks (of the chosen tileset) · 1–4 pick a square · click the maps to pick a block</p>
     <div class="problems" id="problems"></div>
     <div class="row"><span class="lab">Picks file</span><span class="spacer"></span><button type="button" id="copy">Copy</button></div>
     <textarea id="out" readonly aria-label="Picks file"></textarea>
@@ -123,7 +122,7 @@ try { const saved = JSON.parse(localStorage.getItem(KEY)||'null');
   if (saved && saved.length === picks.length && saved.every(p => p.length===4 && p.every(i => i < D.squares.length))) picks = saved; } catch(e){}
 const history = [];
 let sel = {b: 0, q: 0}, showGen1 = false, scale = 2;
-let groupsOn = new Set(D.groups.map((_,i)=>i));
+let from = 'all', page = 0; const PAGE = 300;
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(picks)); } catch(e){} };
 function change(fn){ history.push(picks.map(p=>p.slice())); if (history.length>200) history.shift(); fn(); save(); render(); }
 
@@ -212,27 +211,36 @@ function drawBlock(){
 }
 
 // candidates
-const chipsEl = document.getElementById('chips');
-D.groups.forEach((g,i) => { const bt = document.createElement('button'); bt.type='button'; bt.textContent = g; bt.setAttribute('aria-pressed','true');
-  bt.addEventListener('click', () => { if (groupsOn.has(i)) groupsOn.delete(i); else groupsOn.add(i); bt.setAttribute('aria-pressed', groupsOn.has(i)); render(); });
-  chipsEl.appendChild(bt); });
+const fromEl = document.getElementById('from');
+[['all','All tilesets'], ...D.groups.map((g,i) => [String(i), g])].forEach(([v,t]) => {
+  const o = document.createElement('option'); o.value = v; o.textContent = t; fromEl.appendChild(o); });
+fromEl.onchange = () => { from = fromEl.value; page = 0; render(); };
 function distance(a, b){ let d = 0; for (let k=0;k<4;k++){ const x = tileShades[D.squares[a].t[k]], y = tileShades[D.squares[b].t[k]]; for (let p=0;p<64;p++) d += Math.abs(x[p]-y[p]); } return d; }
 let candList = [];
 function candidates(){
   const orig = D.blocks[sel.b].orig[sel.q];
-  let list = D.squares.map((s,i)=>i).filter(i => groupsOn.has(D.squares[i].g));
-  if (document.getElementById('order').value === 'alike') list.sort((a,b) => distance(a,orig)-distance(b,orig));
+  let list = D.squares.map((s,i)=>i).filter(i => from === 'all' || D.squares[i].g === +from);
+  if (document.getElementById('order').value === 'alike'){
+    const d = new Map(list.map(i => [i, distance(i, orig)]));
+    list.sort((a,b) => d.get(a)-d.get(b) || a-b);
+  }
   return list;
 }
 const candCanvas = document.getElementById('cands'), CS = 32, GAP = 2;
+let lastSel = '';
 function drawCands(){
   candList = candidates();
+  const key = sel.b+'.'+sel.q+'.'+from+'.'+document.getElementById('order').value;
+  if (key !== lastSel){ lastSel = key; const at = candList.indexOf(picks[sel.b][sel.q]); page = at < 0 ? 0 : Math.floor(at/PAGE); }
+  const pages = Math.max(1, Math.ceil(candList.length/PAGE)); page = Math.min(page, pages-1);
+  const shown = candList.slice(page*PAGE, page*PAGE+PAGE);
+  document.getElementById('pageText').textContent = `page ${page+1} of ${pages}`;
   const wrapW = document.getElementById('candsWrap').clientWidth || 380;
   const cols = Math.max(4, Math.floor((wrapW-4)/(CS+GAP)));
-  candCanvas.width = cols*(CS+GAP); candCanvas.height = Math.ceil(candList.length/cols)*(CS+GAP);
+  candCanvas.width = cols*(CS+GAP); candCanvas.height = Math.max(1, Math.ceil(shown.length/cols))*(CS+GAP);
   const ctx = candCanvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
   const cur = picks[sel.b][sel.q], selColor = getComputedStyle(document.body).getPropertyValue('--sel');
-  candList.forEach((s,i) => { const x = (i%cols)*(CS+GAP), y = Math.floor(i/cols)*(CS+GAP);
+  shown.forEach((s,i) => { const x = (i%cols)*(CS+GAP), y = Math.floor(i/cols)*(CS+GAP);
     ctx.drawImage(squareCanvas(s), x, y, CS, CS);
     if (s===cur){ ctx.strokeStyle = selColor; ctx.lineWidth = 2; ctx.strokeRect(x+1,y+1,CS-2,CS-2); } });
   candCanvas.dataset.cols = cols;
@@ -240,17 +248,22 @@ function drawCands(){
 }
 candCanvas.addEventListener('click', e => {
   const r = candCanvas.getBoundingClientRect(), cols = +candCanvas.dataset.cols;
-  const i = Math.floor((e.clientY-r.top)/(CS+GAP))*cols + Math.floor((e.clientX-r.left)/(CS+GAP));
-  if (i < candList.length) change(() => { picks[sel.b][sel.q] = candList[i]; });
+  const i = page*PAGE + Math.floor((e.clientY-r.top)/(CS+GAP))*cols + Math.floor((e.clientX-r.left)/(CS+GAP));
+  if (i < candList.length && i < (page+1)*PAGE) change(() => { picks[sel.b][sel.q] = candList[i]; });
 });
 function cycle(step){
   const list = candList.length ? candList : candidates(); if (!list.length) return;
   const i = list.indexOf(picks[sel.b][sel.q]);
-  change(() => { picks[sel.b][sel.q] = list[((i<0?-1:i)+step+list.length)%list.length]; });
+  const n = ((i<0?-1:i)+step+list.length)%list.length;
+  page = Math.floor(n/PAGE);
+  change(() => { picks[sel.b][sel.q] = list[n]; });
 }
 function cycleWhole(step){
-  const i = D.whole.findIndex(h => h.sq.every((s,q) => s===picks[sel.b][q]));
-  const n = D.whole[((i<0?-1:i)+step+D.whole.length)%D.whole.length];
+  // within the chosen tileset, if one is
+  const list = from === 'all' ? D.whole : D.whole.filter(h => h.name.split(':')[0] === D.groups[+from]);
+  if (!list.length) return;
+  const i = list.findIndex(h => h.sq.every((s,q) => s===picks[sel.b][q]));
+  const n = list[((i<0?-1:i)+step+list.length)%list.length];
   change(() => { picks[sel.b] = n.sq.slice(); });
 }
 
@@ -275,6 +288,8 @@ document.getElementById('wholePrev').onclick = () => cycleWhole(-1);
 document.getElementById('wholeNext').onclick = () => cycleWhole(1);
 document.getElementById('wholeGen1').onclick = () => change(() => { picks[sel.b] = D.blocks[sel.b].orig.slice(); });
 document.getElementById('order').onchange = render;
+document.getElementById('pagePrev').onclick = () => { page = Math.max(0, page-1); drawCands(); };
+document.getElementById('pageNext').onclick = () => { page++; drawCands(); };
 document.getElementById('undo').onclick = () => { if (history.length){ picks = history.pop(); save(); render(); } };
 document.getElementById('reset').onclick = () => change(() => { picks = D.blocks.map(b => b.pick.slice()); });
 const g1t = document.getElementById('gen1Toggle');

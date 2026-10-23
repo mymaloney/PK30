@@ -1,18 +1,16 @@
-"""Kanto's rooms in Pokemon Crystal's and FireRed/LeafGreen's tiles.
+"""Kanto's rooms in Pokemon Crystal's tiles.
 
 Indoors, Crystal redesigned Gen 1's rooms rather than redrawing them, so
 redrawing Gen 1's tiles one by one (tools/crystal_tiles.py) can't work
 there. Here a Gen 1 tileset is replaced whole: every 16x16 square of every
-Gen 1 block (the 4x4 tiles maps are built from) takes a square from
-Crystal's tilesets, from FireRed/LeafGreen's (brought to four shades by
-tools/frlg_tiles.py) or Gen 1's own, the tiles those squares use become the
+Gen 1 block (the 4x4 tiles maps are built from) takes a square from any of
+Crystal's tilesets (Johto's too) or Gen 1's own, the tiles those squares use become the
 tileset, and the tables that name tile numbers are worked out again so that
 every map plays as before:
 
 - where you can walk (gfx/tilesets/*.tilecoll),
 - the counters you talk over, the warp and door tiles, the shelves you read,
-- MORE COLOR's color for each tile (Crystal's palette maps; FireRed's hues;
-  Gen 1's own).
+- MORE COLOR's color for each tile (Crystal's palette maps; Gen 1's own).
 
 The maps themselves don't change: they name blocks, and every block keeps
 its number. Gen 1 checks a 16x16 square by its bottom-left tile, so each
@@ -23,22 +21,20 @@ The picks are in tools/room_tiles/<tileset>.txt, one line per Gen 1 block:
 
     0F <- pokecenter:04                                      a Crystal block, whole
     14 <- mart:2B mart:2B mart:13.0 mart:13.1                four squares
-    0E <- frlg:pokemon_center:2A5 gen1:0E.1 gen1:0E.2 gen1:0E.3
+    0E <- house:06.0 gen1:0E.1 gen1:0E.2 gen1:0E.3
 
 Four picks are the squares top left, top right, bottom left, bottom right:
 `set:BB.q` is square q (0-3) of Crystal block BB (`.q` left out: the same
-corner), `frlg:set:SSS` FireRed's square SSS, `gen1:BB.q` Gen 1's own.
+corner), `gen1:BB.q` Gen 1's own.
 tools/room_picker.py makes a page to choose them by eye. Blocks with no
 line are proposed (Crystal blocks, by the roles of their squares and
 likeness) and written to the file.
 
     git clone --depth 1 https://github.com/pret/pokecrystal /tmp/pokecrystal
-    git clone --depth 1 https://github.com/pret/pokefirered /tmp/pokefirered
-    python3 tools/room_tiles.py /tmp/pokecrystal /tmp/pokefirered pokecenter [sheet.png]
+    python3 tools/room_tiles.py /tmp/pokecrystal pokecenter [sheet.png]
 
 Gen 1's own tilesets are read from git (ORIGINAL), so this can be run again
-after editing the picks. The graphics are pret/pokecrystal's and
-pret/pokefirered's.
+after editing the picks. The graphics are pret/pokecrystal's.
 """
 import collections
 import os
@@ -50,15 +46,13 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from crystal_tiles import REPO, gray_tiles, likeness, write_png  # noqa: E402
-import frlg_tiles  # noqa: E402
 
 ORIGINAL = '4ba5456'  # the last commit with Gen 1's indoor tilesets as they were
 
-# gen 1 graphics tileset -> the tileset constants that use it, the Crystal
-# tilesets and the FireRed maps (whose tilesets) its squares are taken from
+# gen 1 graphics tileset -> the tileset constants that use it, and the
+# Crystal tilesets its blocks are proposed from (picks can name any)
 ROOMS = {
-    'pokecenter': dict(constants=('MART', 'POKECENTER'), crystal=('pokecenter', 'mart', 'house'),
-                       frlg=('PokemonCenter_1F_Layout', 'Mart_Layout')),
+    'pokecenter': dict(constants=('MART', 'POKECENTER'), crystal=('pokecenter', 'mart', 'house')),
 }
 
 QUADS = ((0, 1, 4, 5), (2, 3, 6, 7), (8, 9, 12, 13), (10, 11, 14, 15))
@@ -179,33 +173,21 @@ def propose(g1, cr, b):
     return [('cr', best[1], best[2], i) for i in range(4)]
 
 
-def frlg_color(px):
-    """MORE COLOR's palette nearest a FireRed tile's hue"""
-    import colorsys
-    ink = [c for c in px if frlg_tiles.lum(c) < 235] or px
-    r, g, b = (sum(c[i] for c in ink) / len(ink) / 255 for i in range(3))
-    h, s, v = colorsys.rgb_to_hsv(r, g, b)
-    if s < 0.18:
-        return 3  # gray
-    h *= 360
-    for top, color in ((15, 0), (45, 6), (75, 5), (170, 4), (255, 7), (295, 2), (340, 1), (360, 0)):
-        if h < top:
-            return color
-
-
 class Sources:
     """every square a pick can name: (kind, ...) -> four (tile pixels, MORE COLOR color)"""
 
-    def __init__(self, g1, crystal_root, frlg_root):
+    def __init__(self, g1, crystal_root):
         self.g1 = g1
-        spec = ROOMS[g1.name]
-        self.cr = {cs: CrystalSet(crystal_root, cs) for cs in spec['crystal']}
-        self.fr = {}
-        if frlg_root:
-            for layout in spec['frlg']:
-                fs = frlg_tiles.tileset_for(frlg_root, layout)
-                self.fr[fs.name] = fs
+        self.root = crystal_root
+        self.cr = {cs: CrystalSet(crystal_root, cs) for cs in ROOMS[g1.name]['crystal']}
         self._cache = {}
+
+    def crystal(self, cs):
+        if cs not in self.cr:
+            if not os.path.exists(os.path.join(self.root, f'data/tilesets/{cs}_metatiles.bin')):
+                raise SystemExit(f'no Crystal tileset {cs}')
+            self.cr[cs] = CrystalSet(self.root, cs)
+        return self.cr[cs]
 
     def square(self, ref):
         if ref in self._cache:
@@ -213,17 +195,9 @@ class Sources:
         kind = ref[0]
         if kind == 'cr':
             _, cs, m, q = ref
-            cb = self.cr[cs].blocks[m]
-            out = [(self.cr[cs].tile(cb[k]) or (0,) * 64, self.cr[cs].pal(cb[k])) for k in QUADS[q]]
-        elif kind == 'frlg':
-            _, fs, m = ref
-            if fs not in self.fr:
-                raise SystemExit(f'FireRed tileset {fs}: pass pokefirered, and list its map in ROOMS')
-            rgb = self.fr[fs].rgb(m)
-            out = []
-            for k, px in enumerate(self.fr[fs].shades(m)):
-                part = rgb.crop(((k % 2) * 8, (k // 2) * 8, (k % 2) * 8 + 8, (k // 2) * 8 + 8))
-                out.append((px, frlg_color(list(part.getdata()))))
+            cset = self.crystal(cs)
+            cb = cset.blocks[m]
+            out = [(cset.tile(cb[k]) or (0,) * 64, cset.pal(cb[k])) for k in QUADS[q]]
         else:
             _, b, q = ref
             blank = (0,) * 64
@@ -234,16 +208,14 @@ class Sources:
         return out
 
 
-PICK = r'frlg:(\w+):([0-9A-Fa-f]{3})|gen1:([0-9A-Fa-f]{2})(?:\.([0-3]))?|(\w+):([0-9A-Fa-f]{2})(?:\.([0-3]))?'
+PICK = r'gen1:([0-9A-Fa-f]{2})(?:\.([0-3]))?|(\w+):([0-9A-Fa-f]{2})(?:\.([0-3]))?'
 
 
 def parse_pick(text):
     """a picks line's refs -> four refs"""
     refs = []
-    for fs, fm, gb, gq, cs, cm, cq in re.findall(PICK, text):
-        if fs:
-            refs.append([('frlg', fs, int(fm, 16))])
-        elif gb:
+    for gb, gq, cs, cm, cq in re.findall(PICK, text):
+        if gb:
             refs.append([('gen1', int(gb, 16), int(gq) if gq else i) for i in range(4)] if not gq else
                         [('gen1', int(gb, 16), int(gq))])
         else:
@@ -263,7 +235,7 @@ def read_picks(name):
     picks, notes = {}, {}
     if os.path.exists(path):
         for n, line in enumerate(open(path), 1):
-            m = re.match(r'\s*([0-9A-Fa-f]{2})\s*<-\s*((?:(?:frlg:\w+:[0-9A-Fa-f]{3}|\w+:[0-9A-Fa-f]{2}(?:\.[0-3])?)\s*)+)(.*)', line)
+            m = re.match(r'\s*([0-9A-Fa-f]{2})\s*<-\s*((?:\w+:[0-9A-Fa-f]{2}(?:\.[0-3])?\s*)+)(.*)', line)
             if not m:
                 continue
             pick = parse_pick(m.group(2))
@@ -275,15 +247,13 @@ def read_picks(name):
 
 
 def ref_text(ref, i=None):
-    if ref[0] == 'frlg':
-        return f'frlg:{ref[1]}:{ref[2]:03X}'
     if ref[0] == 'gen1':
         return f'gen1:{ref[1]:02X}' + ('' if ref[2] == i else f'.{ref[2]}')
     return f'{ref[1]}:{ref[2]:02X}' + ('' if ref[3] == i else f'.{ref[3]}')
 
 
 def pick_text(pick):
-    if pick[0][0] != 'frlg' and all(r[:-1] == pick[0][:-1] and r[-1] == i for i, r in enumerate(pick)):
+    if all(r[:-1] == pick[0][:-1] and r[-1] == i for i, r in enumerate(pick)):
         return ref_text(pick[0], 0)
     return ' '.join(ref_text(r, i) for i, r in enumerate(pick))
 
@@ -438,9 +408,9 @@ def map_previews(g1, built, out, scale=2):
     o.resize((o.width * scale // 2, o.height * scale // 2), Image.NEAREST).save(out)
 
 
-def main(crystal_root, frlg_root, name, sheet=None):
+def main(crystal_root, name, sheet=None):
     g1 = Gen1Room(name)
-    src = Sources(g1, crystal_root, frlg_root)
+    src = Sources(g1, crystal_root)
     picks, notes = read_picks(name)
     for b in range(len(g1.blocks)):
         if b not in picks:
@@ -459,4 +429,4 @@ def main(crystal_root, frlg_root, name, sheet=None):
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:4])

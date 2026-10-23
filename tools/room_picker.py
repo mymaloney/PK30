@@ -1,13 +1,13 @@
 """A page to choose a room tileset's squares by eye (tools/room_tiles.py).
 
-Every Gen 1 block's four 16x16 squares can each take a square from Crystal's
-tilesets, FireRed/LeafGreen's (in four shades) or Gen 1's own. The page
+Every Gen 1 block's four 16x16 squares can each take a square from any of
+Crystal's tilesets, Johto's included, or Gen 1's own. The page
 shows every map of the tileset as picked, cycles the candidates for a
 square (or Crystal's whole blocks for a block), counts the tiles against the
 $60 a tileset holds, and gives the picks file to paste into
 tools/room_tiles/<tileset>.txt.
 
-    python3 tools/room_picker.py /tmp/pokecrystal /tmp/pokefirered pokecenter picker.html
+    python3 tools/room_picker.py /tmp/pokecrystal pokecenter picker.html
 """
 import json
 import os
@@ -15,7 +15,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import crystal_tiles  # noqa: E402
-import frlg_tiles  # noqa: E402
 import room_tiles as R  # noqa: E402
 
 TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'room_picker.html')
@@ -27,9 +26,16 @@ def role_key(role):
                      '1' if role[3] else '0', role[4] or ''])
 
 
-def main(crystal_root, frlg_root, name, out):
+def crystal_tilesets(root):
+    """every Crystal tileset with its graphics, the room's own sources first"""
+    names = sorted(f[:-len('_metatiles.bin')] for f in os.listdir(os.path.join(root, 'data/tilesets'))
+                   if f.endswith('_metatiles.bin'))
+    return [n for n in names if os.path.exists(os.path.join(root, f'gfx/tilesets/{n}.png'))]
+
+
+def main(crystal_root, name, out):
     g1 = R.Gen1Room(name)
-    src = R.Sources(g1, crystal_root, frlg_root)
+    src = R.Sources(g1, crystal_root)
     atlas, atlas_ids = [], {}
     squares, by_pixels, ref_index = [], {}, {}
     groups = []
@@ -52,24 +58,15 @@ def main(crystal_root, frlg_root, name, out):
         return len(squares) - 1
 
     whole = []
-    for cs, cset in src.cr.items():
-        groups.append(f'Crystal {cs}')
+    own = list(R.ROOMS[name]['crystal'])
+    for cs in own + [c for c in crystal_tilesets(crystal_root) if c not in own]:
+        cset = src.crystal(cs)
+        groups.append(cs)
         for m in range(len(cset.blocks)):
             if not any(cset.tile(t) for t in cset.blocks[m]):
                 continue
             whole.append(dict(name=f'{cs}:{m:02X}', sq=[add(None, ('cr', cs, m, q)) for q in range(4)]))
-    for fs, fset in src.fr.items():
-        groups.append(f'FireRed {fs}')
-        for m in fset.secondary_squares():
-            if any(any(px) for px, c in src.square(('frlg', fs, m))):
-                add(None, ('frlg', fs, m))
-    for fs, fset in list(src.fr.items())[:1]:
-        groups.append('FireRed building (shared)')
-        for m in range(frlg_tiles.PRIMARY_TILES):
-            if fset.metatiles[m] and any(any(px) for px, c in src.square(('frlg', fs, m))):
-                add(None, ('frlg', fs, m))
-
-    # Gen 1's own last: an identical Crystal or FireRed square keeps its name
+    # Gen 1's own last: an identical Crystal square keeps its Crystal name
     groups.append(f'Gen 1 {name}')
     for b in range(len(g1.blocks)):
         for q in range(4):
@@ -106,4 +103,4 @@ def main(crystal_root, frlg_root, name, out):
 
 
 if __name__ == '__main__':
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:4])
