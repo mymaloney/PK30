@@ -2452,8 +2452,8 @@ it.
 - **Status.** Both are the painting, checked pixel for pixel against it and
   in the emulator (color and DMG; clerks talked to over their counters):
   the Pokémon Centers and the hotel, 40 blocks (3 new), 64 tiles, 2 counter
-  tiles; the marts and the Indigo Plateau lobby, 41 blocks (4 new), 96
-  tiles, 2 counter tiles, after merging 18 near-identical tiles (at most 10
+  tiles; the marts and the Indigo Plateau lobby, 42 blocks (5 new), 96
+  tiles, 2 counter tiles, after merging 10 near-identical tiles (at most 7
   pixels apart: highlight lines on counters and shelves, the doorway's
   shading). The lobby stays with the marts: its shop corner shares their
   tiles, and its Pokémon Center half needed the smallest merges.
