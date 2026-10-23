@@ -446,8 +446,7 @@ IF DEF(_REDGREENJP)
 	and 2
 	cp 2
 ELSE
-	and 3
-	cp 1
+	and 1 ; Crystal's flower: two frames, in turn
 ENDC
 
 IF DEF(_REDGREENJP)
@@ -456,10 +455,8 @@ IF DEF(_REDGREENJP)
 	ld hl, FlowerTile2
 ELSE
 	ld hl, FlowerTile1
-	jr c, .copy
-	ld hl, FlowerTile2
 	jr z, .copy
-	ld hl, FlowerTile3
+	ld hl, FlowerTile2
 ENDC
 .copy
 	ld de, vTileset + $3 * $10
@@ -478,6 +475,5 @@ FlowerTile2: INCBIN "gfx/tilesets/green/flower/flower2.2bpp"
 ELSE
 FlowerTile1: INCBIN "gfx/tilesets/flower/flower1.2bpp"
 FlowerTile2: INCBIN "gfx/tilesets/flower/flower2.2bpp"
-FlowerTile3: INCBIN "gfx/tilesets/flower/flower3.2bpp"
 ENDC
 

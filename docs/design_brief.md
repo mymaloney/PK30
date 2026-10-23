@@ -2324,3 +2324,42 @@ trainer pics, slot machine graphics and songs, 39 per-map block files the
 maps don't use); `docs/learnset_changes.md` (`docs/moveset_changes.md`
 covers it). `docs/shin_readme.md` links Shin's repository for what it
 pointed at here. All builds were made from clean after.
+
+## Crystal's tiles for Kanto's outdoors
+
+Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles
+(pret/pokecrystal `gfx/tilesets/kanto.png`, its DMG flower frames), made by
+`tools/crystal_tiles.py`; its choices, tile by tile, are in
+`tools/crystal_tiles_choices.txt`.
+
+- **How tiles were matched.** Every Gen 1 map Crystal also has (68 pairs,
+  with aliases for renamed ones) was laid over its Crystal counterpart block
+  by block (both games build maps from 4x4-tile blocks), at the offset where
+  they agree most; each Gen 1 tile voted for the Crystal tiles drawn where it
+  is. Crystal's Kanto tileset turned out to keep Gen 1's overworld tile
+  numbers for nearly every tile, redrawn; so a tile takes Crystal's tile of
+  the same number, unless a vote is all but identical and the same number
+  isn't (OVERRIDE: tile $32 takes $33), and keeps its own where Crystal's
+  number is another object (KEEP: $0D, $1D, $3C, $5E, $5F). The town sign
+  ($46/$47/$56/$57), for instance, is Crystal's redrawn sign. The forest's
+  tiles that are the same pictures as overworld tiles (its grass, the small
+  trees) take the overworld's replacements, so they match.
+- **What stays.** Pokémon Centers, marts, houses, gyms, caves, the tower, the
+  ship, the labs: Crystal redesigned those rooms rather than redrawing Gen 1's
+  tiles, and no tile-for-tile match held up when rendered (tried three ways:
+  by votes, by whole blocks, and by likeness alone): furniture came out
+  half-redrawn, chairs sat in boxes of the old floor, floors lost their
+  texture, and in Mt. Moon the holes and ladders vanished. They keep Gen 1's
+  tiles.
+- **Unchanged behaviour.** Tile numbers are untouched, so collision, grass,
+  water, ledges, warps, Cut trees and the GBC colors by tile (MORE COLOR) are
+  as before. Water still animates by rotating tile $14. The flower is
+  Crystal's two DMG frames, now alternating (Gen 1 cycled three); the third
+  frame is gone and the code is 7 bytes shorter. Green and Blue-JP's own
+  overworld and forest tilesets get the same replacements where their tile is
+  the same as Red's.
+- **DMG compatible.** Crystal's tiles are four shades already (its colors come
+  from palettes); they go in as they are, so the game looks the same on a
+  Game Boy, redrawn. Checked in the emulator in DMG and GBC modes (MORE COLOR
+  off and on): Pallet Town, Cerulean City, Fuchsia City, Route 1 and
+  Viridian Forest, the flowers animating.

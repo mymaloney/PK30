@@ -25,7 +25,8 @@ Build: see [INSTALL.md](INSTALL.md) (`make` builds Red, Blue, Green, Red-JP, Blu
 <tr><td align="center"><img src="screenshots/fork/gen2_sprites_battle.png" width="240"><br><sub>SPRITES: GEN 2</sub></td><td align="center"><img src="screenshots/fork/start_menu_pc.png" width="240"><br><sub>PC IN MENU</sub></td><td align="center"><img src="screenshots/fork/dexrepel_aide_given.png" width="240"><br><sub>DEXREPEL explained (1/2)</sub></td></tr>
 <tr><td align="center"><img src="screenshots/fork/dexrepel_aide_given2.png" width="240"><br><sub>DEXREPEL explained (2/2)</sub></td><td align="center"><img src="screenshots/fork/repel_prompt.png" width="240"><br><sub>Use another repel?</sub></td><td align="center"><img src="screenshots/fork/catch_exp_levelup.png" width="240"><br><sub>EXP on catch</sub></td></tr>
 <tr><td align="center"><img src="screenshots/fork/warp_back_prompt.png" width="240"><br><sub>WARP BACK after a blackout</sub></td><td align="center"><img src="screenshots/fork/hp_percent.png" width="240"><br><sub>HP PERCENT</sub></td><td align="center"><img src="screenshots/fork/shop_buy.png" width="240"><br><sub>Shop: item descriptions</sub></td></tr>
-<tr><td align="center"><img src="screenshots/fork/options_randomizer.png" width="240"><br><sub>OPTION: RANDOMIZER</sub></td><td align="center"><img src="screenshots/fork/options_random_mons.png" width="240"><br><sub>OPTION: RANDOM POKéMON</sub></td></tr>
+<tr><td align="center"><img src="screenshots/fork/options_randomizer.png" width="240"><br><sub>OPTION: RANDOMIZER</sub></td><td align="center"><img src="screenshots/fork/options_random_mons.png" width="240"><br><sub>OPTION: RANDOM POKéMON</sub></td><td align="center"><img src="screenshots/fork/tiles_crystal_color.png" width="240"><br><sub>Crystal tiles (MORE COLOR)</sub></td></tr>
+<tr><td align="center"><img src="screenshots/fork/tiles_crystal_dmg.png" width="240"><br><sub>Crystal tiles (Game Boy)</sub></td></tr>
 </table>
 
 ## Changes from Shin Pokémon (this fork)
@@ -176,6 +177,7 @@ Every option starts as the original game played; everything extra is off by defa
 
 #### Graphics
 - SPRITES option: GEN 1 (default) or GEN 2 (Pokémon Crystal fronts and backs, from pret's pokecrystal).
+- Towns, routes and Viridian Forest use Pokémon Crystal's redrawn Kanto tiles (and its flowers), in four shades, so they look the same on a Game Boy as before, only redrawn; with MORE COLOR on a Game Boy Color they take Gold/Silver's look. Every tile keeps its number, so nothing plays differently. Buildings' insides, caves and gyms keep their tiles: Crystal redesigned those rather than redrawing them.
 - Party icons: a two-frame icon per species from "MINIDEX 001-251" (Chamber, Solo993, Blue Emerald, Lake, Neslug, Pikachu25).
 - Rocking two-frame egg icon.
 - Gen 2 sprites keep Gen 1 palettes on Game Boy Color.
@@ -462,7 +464,7 @@ Every option starts as the original game played; everything extra is off by defa
 
 ## Credits
 
-**pret** — the [pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow) and [pokecrystal](https://github.com/pret/pokecrystal) disassemblies and their documentation, without which none of this exists. Shin was branched from pret/pokered at [merge pull request #185 (Jul 2, 2018)](https://github.com/pret/pokered/tree/c8599831992c91e521cf1d467ccae3d9498e42ef). Pokémon Crystal's sprites (SPRITES: GEN 2) come from pret's pokecrystal.
+**pret** — the [pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow) and [pokecrystal](https://github.com/pret/pokecrystal) disassemblies and their documentation, without which none of this exists. Shin was branched from pret/pokered at [merge pull request #185 (Jul 2, 2018)](https://github.com/pret/pokered/tree/c8599831992c91e521cf1d467ccae3d9498e42ef). Pokémon Crystal's sprites (SPRITES: GEN 2) and Kanto's outdoor tiles come from pret's pokecrystal.
 
 **Shin Pokémon** — [jojobear13](https://github.com/jojobear13/shinpokered) and the Shin team, whose engine fixes, AI, options and features this fork is built on. Shin's credits:
 - Jojobear13's wife, for copywriting and voicework
