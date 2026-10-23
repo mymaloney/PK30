@@ -39,3 +39,6 @@ __pycache__/
 # for vim configuration
 # url: http://www.vim.org/scripts/script.php?script_id=441
 .lvimrc
+
+# made by tools/rooms.py on each check
+art/rooms/*/twins.png

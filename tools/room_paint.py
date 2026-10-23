@@ -1,6 +1,7 @@
 """Paint Kanto's rooms over: export them as pictures, read the painting back.
+(tools/rooms.py is the everyday way in: it checks, merges and builds.)
 
-    python3 tools/room_paint.py /tmp/pokecrystal export pokecenter
+    python3 tools/room_paint.py export pokecenter
 
 renders every map of a room tileset, as tools/room_tiles/<tileset>.txt picks
 it, into art/rooms/<tileset>/:
@@ -18,6 +19,7 @@ importer will ask which to keep.
 """
 import collections
 import os
+import re
 import sys
 
 from PIL import Image, ImageDraw
@@ -27,6 +29,27 @@ import room_tiles as R  # noqa: E402
 
 GRAYS = (255, 170, 85, 0)
 ART = os.path.join(R.REPO, 'art/rooms')
+
+
+def picked(name, crystal_root=None):
+    """per block, its 16 tiles as tools/room_tiles/<tileset>.txt picked them,
+    (shades, MORE COLOR color) square by square: kept in
+    tools/room_tiles/<tileset>_picked.json, so painting needs no pokecrystal
+    (remaking it, after the picks change, does)"""
+    import json
+    path = os.path.join(R.REPO, f'tools/room_tiles/{name}_picked.json')
+    if crystal_root:
+        g1 = R.Gen1Room(name)
+        src = R.Sources(g1, crystal_root)
+        picks, notes = R.read_picks(name)
+        out = []
+        for b in range(len(g1.blocks)):
+            pick = picks.get(b) or [('gen1', b, q) for q in range(4)]
+            out.append([[''.join(map(str, px)), color] for ref in pick for px, color in src.square(ref)])
+        open(path, 'w').write(json.dumps(out, separators=(',', ':')) + '\n')
+    if not os.path.exists(path):
+        raise SystemExit(f'{path} missing: make it with pokecrystal (tools/room_paint.py picked {name} <pokecrystal>)')
+    return [[(tuple(int(c) for c in px), color) for px, color in block] for block in json.load(open(path))]
 
 
 def square_image(squares):
@@ -39,12 +62,13 @@ def square_image(squares):
     return im
 
 
-def render(src, picks, w, h, blk):
+def render(chosen, w, h, blk):
     im = Image.new('L', (w * 32, h * 32))
     for y in range(h):
         for x in range(w):
-            for q, ref in enumerate(picks[blk[y * w + x]]):
-                im.paste(square_image(src.square(ref)), (x * 32 + (q % 2) * 16, y * 32 + (q // 2) * 16))
+            block = chosen[blk[y * w + x]]
+            for q in range(4):
+                im.paste(square_image(block[q * 4:q * 4 + 4]), (x * 32 + (q % 2) * 16, y * 32 + (q // 2) * 16))
     return im
 
 
@@ -69,18 +93,16 @@ def guide(g1, im, w, h, blk, scale=4):
     return Image.alpha_composite(big.convert('RGBA'), over).convert('RGB')
 
 
-def export(crystal_root, name):
+def export(name, crystal_root=None):
+    """the rooms as picked, to start painting from (painted/ is left alone)"""
     g1 = R.Gen1Room(name)
-    src = R.Sources(g1, crystal_root)
-    picks, notes = R.read_picks(name)
-    for b in range(len(g1.blocks)):
-        picks.setdefault(b, [('gen1', b, q) for q in range(4)])
+    chosen = picked(name, crystal_root)
     out = os.path.join(ART, name)
     os.makedirs(out, exist_ok=True)
     written = []
     for names, paths, w, h, blk in layouts(name):
         stem = names[0].lower()
-        im = render(src, picks, w, h, blk)
+        im = render(chosen, w, h, blk)
         im.save(os.path.join(out, f'{stem}.png'))
         guide(g1, im, w, h, blk).save(os.path.join(out, f'{stem}_guide.png'))
         written.append((stem, names))
@@ -124,20 +146,23 @@ def read_painting(path, w, h):
     return snap(im)
 
 
-def painted_blocks(g1, src, picks, name):
+def painted_blocks(g1, chosen, name, arts=None):
     """every block as painted -> (uses for room_tiles.assemble, new map blocks per layout)
 
     A Gen 1 block painted the same everywhere keeps its number; one painted
     differently somewhere becomes a new block there (after the Gen 1 ones),
     with the same roles. Colors (MORE COLOR) come from the squares the picks
-    named."""
+    named (chosen: picked())."""
     found = []  # (layout, x, y, gen 1 block, 32x32 shades)
     lays = layouts(name)
     for names, paths, w, h, blk in lays:
-        art = os.path.join(ART, name, f'{names[0].lower()}.png')
-        if not os.path.exists(art):
-            raise SystemExit(f'no painting {art}')
-        px = read_painting(art, w, h).load()
+        if arts:  # (shades images, by map)
+            px = arts[names[0].lower()].load()
+        else:
+            art = os.path.join(ART, name, f'{names[0].lower()}.png')
+            if not os.path.exists(art):
+                raise SystemExit(f'no painting {art}')
+            px = read_painting(art, w, h).load()
         for y in range(h):
             for x in range(w):
                 shades = tuple(px[x * 32 + i, y * 32 + j] for j in range(32) for i in range(32))
@@ -160,8 +185,8 @@ def painted_blocks(g1, src, picks, name):
     for i in range(extra):
         if i not in source and i in borders:  # drawn past the map's edges: as picked, no roles
             uses.append([None] * 16)
-            for q, ref in enumerate(picks[i]):
-                for k, (px, color) in zip(R.QUADS[q], src.square(ref)):
+            for q in range(4):
+                for k, (px, color) in zip(R.QUADS[q], chosen[i][q * 4:q * 4 + 4]):
                     uses[-1][k] = (px, color, None)
             continue
         if i not in source:  # a block no map shows: any pictures, no roles
@@ -169,7 +194,7 @@ def painted_blocks(g1, src, picks, name):
             continue
         b, sh = source[i]
         roles = square_roles_of(g1, b)
-        colors = [color for ref in picks[b] for px, color in src.square(ref)]
+        colors = [color for px, color in chosen[b]]
         row = [None] * 16
         for k in range(16):
             tx, ty = (k % 4) * 8, (k // 4) * 8
@@ -201,17 +226,15 @@ def square_roles_of(g1, b):
     return R.square_roles(g1, g1.blocks[b], b)
 
 
-def build(crystal_root, name):
+def build(name, quiet=False):
+    """the tileset, its tables and its maps from art/rooms/<tileset>/<map>.png"""
     g1 = R.Gen1Room(name)
-    src = R.Sources(g1, crystal_root)
-    picks, notes = R.read_picks(name)
-    for b in range(len(g1.blocks)):
-        picks.setdefault(b, [('gen1', b, q) for q in range(4)])
-    uses, new_maps, split = painted_blocks(g1, src, picks, name)
+    uses, new_maps, split = painted_blocks(g1, picked(name), name)
     built, problems = R.assemble(uses)
-    print(f'{name}: {len(uses)} blocks ({sum(split.values()) - len(split)} new, from '
-          f'{", ".join(f"{b:02X}" for b in sorted(split)) or "none"}), {len(built[0])} tiles, '
-          f'{len(built[3])} counter tiles')
+    if not quiet:
+        print(f'{name}: {len(uses)} blocks ({sum(split.values()) - len(split)} new, from '
+              f'{", ".join(f"{b:02X}" for b in sorted(split)) or "none"}), {len(built[0])} tiles, '
+              f'{len(built[3])} counter tiles')
     if problems:
         raise SystemExit('\n'.join(problems))
     R.write(name, g1, built)
@@ -221,107 +244,25 @@ def build(crystal_root, name):
             open(path, 'wb').write(data)
 
 
-def tile_count(crystal_root, name):
-    g1 = R.Gen1Room(name)
-    src = R.Sources(g1, crystal_root)
-    picks, notes = R.read_picks(name)
-    for b in range(len(g1.blocks)):
-        picks.setdefault(b, [('gen1', b, q) for q in range(4)])
-    uses, new_maps, split = painted_blocks(g1, src, picks, name)
+def tile_count(name, g1=None, chosen=None, arts=None):
+    """-> (tiles the tileset needs, counter tiles, problems), from art/rooms/<tileset>/<map>.png
+    (or arts: {map: shades image})"""
+    g1 = g1 or R.Gen1Room(name)
+    uses, new_maps, split = painted_blocks(g1, chosen or picked(name), name, arts)
     built, problems = R.assemble(uses)
-    return len({px for row in uses for px, c, r in row}), problems
-
-
-def optimize(crystal_root, name, limit=14):
-    """Bring a room tileset's paintings within its tiles: the two most alike
-    tiles (the fewest pixels apart, never more than limit) become one, the
-    one used less taking the other's picture, until it fits. The paintings
-    are saved as merged; the painter's own are kept in painted/, and
-    changes.png marks every pixel that changed (red), at 4x."""
-    lays = layouts(name)
-    arts, pics = {}, collections.Counter()
-    for names, paths, w, h, blk in lays:
-        stem = names[0].lower()
-        mine = os.path.join(ART, name, 'painted', f'{stem}.png')
-        path = mine if os.path.exists(mine) else os.path.join(ART, name, f'{stem}.png')
-        im = read_painting(path, w, h)
-        arts[stem] = (im, w, h)
-        px = im.load()
-        for ty in range(h * 4):
-            for tx in range(w * 4):
-                pics[tuple(px[tx * 8 + i, ty * 8 + j] for j in range(8) for i in range(8))] += 1
-
-    def apart(a, b):
-        return sum(x != y for x, y in zip(a, b))
-    into = {}  # picture -> the picture it now is
-
-    def now(t):
-        while t in into:
-            t = into[t]
-        return t
-
-    def save():
-        os.makedirs(os.path.join(ART, name, 'painted'), exist_ok=True)
-        marks = []
-        for stem, (im, w, h) in arts.items():
-            mine = os.path.join(ART, name, 'painted', f'{stem}.png')
-            if not os.path.exists(mine):
-                im.point(lambda v: GRAYS[min(v, 3)]).save(mine)
-            out = im.copy()
-            px, op = im.load(), out.load()
-            for ty in range(h * 4):
-                for tx in range(w * 4):
-                    t = now(tuple(px[tx * 8 + i, ty * 8 + j] for j in range(8) for i in range(8)))
-                    for j in range(8):
-                        for i in range(8):
-                            op[tx * 8 + i, ty * 8 + j] = t[j * 8 + i]
-            out.point(lambda v: GRAYS[min(v, 3)]).save(os.path.join(ART, name, f'{stem}.png'))
-            big = out.point(lambda v: GRAYS[min(v, 3)]).convert('RGB').resize((w * 128, h * 128), Image.NEAREST)
-            d = ImageDraw.Draw(big)
-            for y in range(h * 32):
-                for x in range(w * 32):
-                    if px[x, y] != op[x, y]:
-                        d.rectangle([x * 4, y * 4, x * 4 + 3, y * 4 + 3], fill=(230, 30, 30))
-            marks.append(big)
-        sheet = Image.new('RGB', (max(m.width for m in marks), sum(m.height + 8 for m in marks)), (60, 60, 60))
-        y = 0
-        for m in marks:
-            sheet.paste(m, (0, y))
-            y += m.height + 8
-        sheet.save(os.path.join(ART, name, 'changes.png'))
-
-    save()
-    count, problems = tile_count(crystal_root, name)
-    pairs = sorted((apart(a, b), a, b) for i, a in enumerate(pics) for b in list(pics)[i + 1:])
-    merged = []
-    for d, a, b in pairs:
-        if not problems:
-            break
-        if d > limit:
-            break
-        a, b = now(a), now(b)
-        if a == b:
-            continue
-        keep, lose = (a, b) if pics[a] >= pics[b] else (b, a)
-        # every picture that becomes this one stays within limit of it
-        if any(apart(t, keep) > limit for t in list(into) + [lose] if now(t) == lose or t == lose):
-            continue
-        into[lose] = keep
-        pics[keep] += pics[lose]
-        merged.append(d)
-        save()
-        count, problems = tile_count(crystal_root, name)
-    print(f'{name}: {len(merged)} tiles merged (at most {max(merged or [0])} pixels apart), '
-          f'{count} pictures' + (': ' + '; '.join(problems) if problems else ', fits'))
+    m = re.match(r'(\d+) tiles', problems[0]) if problems else None
+    return (int(m.group(1)) if m else len(built[0])), len(built[3]), problems
 
 
 if __name__ == '__main__':
-    root, what, name = sys.argv[1:4]
-    if what == 'export':
-        export(root, name)
+    # tools/rooms.py is the everyday way in; these are the steps one by one
+    what, name = sys.argv[1:3]
+    root = sys.argv[3] if len(sys.argv) > 3 else None  # pokecrystal, to remake picked()
+    if what == 'picked':
+        picked(name, root)
+    elif what == 'export':
+        export(name, root)
     elif what == 'build':
-        build(root, name)
+        build(name)
     elif what == 'guides':
         guides(name)
-    elif what == 'optimize':
-        optimize(root, name)

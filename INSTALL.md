@@ -130,3 +130,17 @@ If you have different projects that require different versions of `rgbds`, it mi
 ```bash
 make RGBDS=rgbds-0.6.0/
 ```
+
+
+## Painting the rooms
+
+The Pokémon Centers, marts, Celadon Hotel and Indigo Plateau lobby are built
+from paintings in `art/rooms/`. Checking them and building them into the
+game needs Python 3 with Pillow (`pip install pillow`):
+
+```bash
+python3 tools/rooms.py --watch
+```
+
+See [art/rooms/README.md](art/rooms/README.md).
+

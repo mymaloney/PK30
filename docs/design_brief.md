@@ -2444,11 +2444,22 @@ it.
   stands on one side and the other side can be walked to from the doors
   (`counters_talked_over`); the rest are walls. That leaves 2-3 counter
   tiles per tileset where the painting needed 4-5.
-- **Fitting by merging (`room_paint.py optimize`).** When a tileset's
+- **On the painter's machine (`tools/rooms.py`).** One command checks every
+  painting in `art/rooms/<tileset>/painted/` (size, grays; a cropped one is
+  completed from the current room, with a warning), says how many tiles and
+  counter tiles each tileset needs, draws `twins.png` (each tile with a near
+  twin, the differing pixels, every place it is used) where one is over,
+  and builds those that fit; `--merge` merges the twins, `--watch` checks
+  on every save, `--make` builds the ROM. It needs Python and Pillow only:
+  the colors and pictures the paintings started from are kept in
+  `tools/room_tiles/<tileset>_picked.json` (remade from pokecrystal with
+  `room_paint.py picked` when the picks change). Instructions:
+  `art/rooms/README.md`.
+- **Fitting by merging (`tools/rooms.py --merge`).** When a tileset's
   paintings need more than $60 tiles, the two most alike tiles (fewest
   pixels apart, at most 14) become one, the less used taking the other's
   picture, until it fits. The painter's own paintings stay in
-  `art/rooms/<tileset>/painted/`; `changes.png` marks every pixel changed.
+  `art/rooms/<tileset>/painted/`; `twins.png` shows what merges.
 - **Status.** Both are the painting, checked pixel for pixel against it and
   in the emulator (color and DMG; clerks talked to over their counters):
   the Pokémon Centers and the hotel, 40 blocks (3 new), 64 tiles, 2 counter
