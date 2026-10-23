@@ -42,3 +42,5 @@ __pycache__/
 
 # made by tools/rooms.py on each check
 art/rooms/*/twins.png
+# what the painted rooms started from (tools/room_paint.py picked)
+!tools/room_tiles/*_picked.json
